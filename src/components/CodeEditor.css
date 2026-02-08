@@ -1,0 +1,94 @@
+.code-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg-code);
+}
+
+.editor-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+}
+
+.line-numbers {
+    background: var(--bg-sidebar);
+    padding: 16px 0;
+    text-align: right;
+    user-select: none;
+    border-right: 1px solid var(--border-light);
+    min-width: 50px;
+    overflow: hidden;
+}
+
+.line-number {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-hint);
+    padding: 0 12px;
+}
+
+.code-input {
+    flex: 1;
+    border: none;
+    resize: none;
+    padding: 16px 20px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-code);
+    outline: none;
+    tab-size: 4;
+}
+
+.editor-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-light);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.file-path-status {
+    font-family: var(--font-mono);
+}
+
+.editor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.editor-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.editor-btn:hover {
+    background: var(--bg-primary);
+}
+
+.editor-btn.primary {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+}
+
+.editor-btn.primary:hover {
+    background: #0055aa;
+}
+
+.editor-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
