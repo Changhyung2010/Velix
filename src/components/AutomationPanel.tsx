@@ -2,12 +2,17 @@ import React, { useState, useCallback } from 'react';
 import '../styles/AutomationPanel.css';
 import { aiService } from '../services/ai/AIService';
 import { PROVIDERS } from '../services/ai/types';
+import { TerminalRef } from './TerminalBlock';
 
-interface AutomationTask {
+interface TerminalTab {
   id: string;
-  name: string;
+  title: string;
+}
+
+interface SubTask {
+  id: string;
   prompt: string;
-  status: 'idle' | 'running' | 'completed' | 'error';
+  assignedTabId: string | null;
 }
 
 interface AutomationPanelProps {
@@ -16,11 +21,14 @@ interface AutomationPanelProps {
   theme: 'light' | 'dark';
   hasApiKey: boolean;
   configuredProviders: Array<{ id: string; name: string }>;
+  terminalTabs: TerminalTab[];
+  terminalRefs: React.MutableRefObject<Map<string, TerminalRef>>;
+  onAddTerminal: () => void;
   onGeneratePrompts?: (goal: string, count: number) => Promise<string[]>;
   onStartAutomation?: (prompts: string[]) => void;
 }
 
-const DEFAULT_PROMPTS = [
+const TEMPLATES = [
   'Review the codebase and identify potential bugs or issues',
   'Add comprehensive error handling to all async functions',
   'Write unit tests for the main components',
@@ -33,155 +41,167 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
   theme,
   hasApiKey,
   configuredProviders,
+  terminalTabs,
+  terminalRefs,
+  onAddTerminal,
   onGeneratePrompts,
-  onStartAutomation,
 }) => {
-  const [tasks, setTasks] = useState<AutomationTask[]>([]);
-  const [newTaskName, setNewTaskName] = useState('');
-  const [newTaskPrompt, setNewTaskPrompt] = useState('');
-  const [isAutomationRunning, setIsAutomationRunning] = useState(false);
-  const [globalPrompt, setGlobalPrompt] = useState('');
-  const [numInstances, setNumInstances] = useState(1);
-  const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(aiService.getConfig().model);
-  const [complexityAnalysis, setComplexityAnalysis] = useState<{ complexity: number; agentCount: number; reasoning: string } | null>(null);
+  const [goal, setGoal] = useState('');
+  const [subtasks, setSubtasks] = useState<SubTask[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [complexityAnalysis, setComplexityAnalysis] = useState<{
+    complexity: number;
+    agentCount: number;
+    reasoning: string;
+  } | null>(null);
+  const [dispatching, setDispatching] = useState(false);
+  const [dispatchStatus, setDispatchStatus] = useState<Record<string, 'dispatched' | 'error'>>({});
+  const [selectedModel, setSelectedModel] = useState<string>(aiService.getConfig().model);
 
   const handleModelChange = (model: string) => {
     setSelectedModel(model);
-    // Find provider for this model
     const provider = PROVIDERS.find(p => p.models.includes(model));
     if (provider) {
       aiService.setProvider(provider.id, model);
     }
   };
 
-  // Start all automation tasks - creates one terminal tab per agent
-  const startAllTasks = useCallback(async () => {
-    if (!hasApiKey || !onStartAutomation) return;
+  const handleAnalyze = useCallback(async () => {
+    if (!goal.trim() || !hasApiKey) return;
 
-    let promptsToRun: string[] = tasks.map(t => t.prompt);
+    setIsAnalyzing(true);
+    setComplexityAnalysis(null);
+    setSubtasks([]);
+    setDispatchStatus({});
 
-    // If no queued tasks and we have a global prompt: analyze complexity then generate N prompts
-    if (promptsToRun.length === 0 && onGeneratePrompts && globalPrompt.trim()) {
-      setIsAnalyzing(true);
-      setComplexityAnalysis(null);
+    try {
+      const analysis = await aiService.analyzeTaskComplexity(goal.trim());
+      setComplexityAnalysis(analysis);
+    } catch (err) {
+      console.error('Failed to analyze task:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [goal, hasApiKey]);
+
+  const handleGenerateSubtasks = useCallback(async () => {
+    if (!goal.trim() || !hasApiKey || !onGeneratePrompts) return;
+
+    const count = complexityAnalysis?.agentCount ?? Math.max(terminalTabs.length, 1);
+
+    setIsGenerating(true);
+    try {
+      const prompts = await onGeneratePrompts(goal.trim(), count);
+      const newSubtasks: SubTask[] = prompts.map((prompt, i) => ({
+        id: `subtask-${Date.now()}-${i}`,
+        prompt,
+        // Auto-assign round-robin to available terminals
+        assignedTabId: terminalTabs[i % terminalTabs.length]?.id ?? null,
+      }));
+      setSubtasks(newSubtasks);
+      setDispatchStatus({});
+    } catch (err) {
+      console.error('Failed to generate subtasks:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [goal, hasApiKey, onGeneratePrompts, complexityAnalysis, terminalTabs]);
+
+  const handleDispatch = useCallback(async () => {
+    if (!hasApiKey || subtasks.length === 0) return;
+
+    setDispatching(true);
+    const newStatus: Record<string, 'dispatched' | 'error'> = {};
+
+    for (const subtask of subtasks) {
+      if (!subtask.assignedTabId) {
+        newStatus[subtask.id] = 'error';
+        continue;
+      }
+
+      const terminalRef = terminalRefs.current.get(subtask.assignedTabId);
+      if (!terminalRef) {
+        newStatus[subtask.id] = 'error';
+        continue;
+      }
 
       try {
-        // 1. Analyze complexity to determine how many agents are needed (1-5)
-        const analysis = await aiService.analyzeTaskComplexity(globalPrompt.trim());
-        setComplexityAnalysis(analysis);
-        const agentCount = analysis.agentCount;
-        setNumInstances(agentCount);
-
-        setIsAnalyzing(false);
-        setIsGeneratingPrompts(true);
-
-        // 2. Generate a distinct, detailed prompt for each agent
-        promptsToRun = await onGeneratePrompts(globalPrompt.trim(), agentCount);
-
-        // Reflect prompts in the tasks list so the user can see what's being run
-        const newTasks: AutomationTask[] = promptsToRun.map((prompt, i) => ({
-          id: `task-${Date.now()}-${i}`,
-          name: `Agent ${i + 1}`,
-          prompt,
-          status: 'idle' as const,
-        }));
-        setTasks(newTasks);
-      } catch (err) {
-        console.error('Automation: failed to analyze/generate prompts:', err);
-        setIsAnalyzing(false);
-        setIsGeneratingPrompts(false);
-        return;
+        const escaped = subtask.prompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        terminalRef.write(`claude "${escaped}"\r`);
+        newStatus[subtask.id] = 'dispatched';
+      } catch {
+        newStatus[subtask.id] = 'error';
       }
-      setIsGeneratingPrompts(false);
+
+      // Small delay between dispatches
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    if (promptsToRun.length === 0) return;
+    setDispatchStatus(newStatus);
+    setDispatching(false);
 
-    setIsAutomationRunning(true);
+    // Close after a moment so user can see the confirmation
+    setTimeout(() => onClose(), 1200);
+  }, [hasApiKey, subtasks, terminalRefs, onClose]);
 
-    // Hand off to App.tsx: it will open one terminal tab per prompt and run claude in each
-    onStartAutomation(promptsToRun);
+  // Broadcast the same goal to every open session
+  const handleBroadcast = useCallback(async () => {
+    if (!goal.trim() || !hasApiKey || terminalTabs.length === 0) return;
 
-    // Close panel so the user can see the new terminals
+    for (const tab of terminalTabs) {
+      const ref = terminalRefs.current.get(tab.id);
+      if (ref) {
+        const escaped = goal.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        ref.write(`claude "${escaped}"\r`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
     onClose();
+  }, [goal, hasApiKey, terminalTabs, terminalRefs, onClose]);
 
-    setIsAutomationRunning(false);
-    setTasks([]);
-  }, [tasks, onGeneratePrompts, globalPrompt, numInstances, hasApiKey, onStartAutomation, onClose]);
-
-  // Add a new task
-  const addTask = useCallback(() => {
-    if (!hasApiKey) return;
-    if (!newTaskName.trim() || !newTaskPrompt.trim()) return;
-
-    const newTask: AutomationTask = {
-      id: `task-${Date.now()}`,
-      name: newTaskName.trim(),
-      prompt: newTaskPrompt.trim(),
-      status: 'idle',
-    };
-
-    setTasks(prev => [...prev, newTask]);
-    setNewTaskName('');
-    setNewTaskPrompt('');
-  }, [newTaskName, newTaskPrompt, hasApiKey]);
-
-  // Quick add: enqueue the current global prompt as a single task
-  const quickAddTasks = useCallback(() => {
-    if (!hasApiKey) return;
-    if (!globalPrompt.trim()) return;
-
-    const newTask: AutomationTask = {
-      id: `task-${Date.now()}`,
-      name: 'Claude Agent',
-      prompt: globalPrompt.trim(),
-      status: 'idle',
-    };
-
-    setTasks(prev => [...prev, newTask]);
-    setGlobalPrompt('');
-  }, [globalPrompt, hasApiKey]);
-
-  // Use template prompt
-  const useTemplate = useCallback((prompt: string) => {
-    if (!hasApiKey) return;
-    setGlobalPrompt(prompt);
-  }, [hasApiKey]);
+  const handleAssign = (subtaskId: string, tabId: string | null) => {
+    setSubtasks(prev => prev.map(st =>
+      st.id === subtaskId ? { ...st, assignedTabId: tabId } : st
+    ));
+  };
 
   if (!isOpen) return null;
+
+  const allDispatched = subtasks.length > 0 && subtasks.every(st => dispatchStatus[st.id] === 'dispatched');
+  const canDispatch = subtasks.some(st => st.assignedTabId);
 
   return (
     <div className={`automation-panel ${theme}`}>
       <div className="automation-header">
-        <h2>Automation Claude Code</h2>
-        <button className="close-btn" onClick={onClose}>x</button>
+        <h2>Claude Code Controller</h2>
+        <button className="close-btn" onClick={onClose}>×</button>
       </div>
 
       <div className="automation-content">
         {!hasApiKey && (
           <div className="automation-api-key-required">
-            <strong>API key required</strong>
-            <p>Automation uses an AI to control Claude Code. Add an API key in Settings (Claude, ChatGPT, etc.) to use this feature. Claude Code itself uses your login — the API key is for the automation AI.</p>
+            <strong>API Key Required</strong>
+            <p>Add an API key in Settings to use the automation controller.</p>
           </div>
         )}
 
         {/* Model Selector */}
         <div className="automation-section">
-          <div className="model-selector">
-            <label>AI Model:</label>
+          <div className="model-row">
+            <label className="model-label">AI Model</label>
             <select
               value={selectedModel}
-              onChange={(e) => handleModelChange(e.target.value)}
+              onChange={e => handleModelChange(e.target.value)}
               className="model-select"
-              disabled={isAutomationRunning || isAnalyzing}
+              disabled={isAnalyzing || isGenerating || dispatching}
             >
               {PROVIDERS.flatMap(p => {
                 const isConfigured = configuredProviders.some(cp => cp.id === p.id);
                 return p.models.map(m => (
                   <option key={m} value={m} disabled={!isConfigured}>
-                    {m} ({p.name}){isConfigured ? '' : ' - Setup Required'}
+                    {m} ({p.name}){isConfigured ? '' : ' — Setup Required'}
                   </option>
                 ));
               })}
@@ -189,132 +209,128 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({
           </div>
         </div>
 
-        {/* Complexity Analysis Result */}
-        {complexityAnalysis && (
-          <div className="complexity-analysis">
-            <div className="complexity-header">
-              <span>Task Complexity</span>
-              <span className={`complexity-score ${complexityAnalysis.complexity >= 7 ? 'high' : complexityAnalysis.complexity >= 4 ? 'medium' : 'low'}`}>
-                {complexityAnalysis.complexity}/10
-              </span>
-            </div>
-            <div className="agent-count">
-              Recommended Agents: <strong>{complexityAnalysis.agentCount}</strong>
-            </div>
-            <p className="complexity-reasoning">{complexityAnalysis.reasoning}</p>
-          </div>
-        )}
-
-        {/* Quick Setup Section */}
+        {/* Active Sessions */}
         <div className="automation-section">
-          <h3>Quick Setup</h3>
-          <p className="hint-text">Commands will run in your main terminal.</p>
-          <div className="quick-setup">
-            <div className="input-row">
-              <label>Goal:</label>
-              <textarea
-                value={globalPrompt}
-                onChange={(e) => setGlobalPrompt(e.target.value)}
-                placeholder="e.g. Review and improve the codebase. Fix bugs and add tests..."
-                disabled={!hasApiKey || isAutomationRunning}
-                rows={3}
-              />
-            </div>
-            <button
-              className="add-btn"
-              onClick={quickAddTasks}
-              disabled={!hasApiKey || !globalPrompt.trim() || isAutomationRunning}
-            >
-              Start Agent
-            </button>
+          <div className="section-header-row">
+            <h3>Active Sessions ({terminalTabs.length})</h3>
+            <button className="add-session-btn" onClick={onAddTerminal}>+ New</button>
           </div>
+          <div className="sessions-grid">
+            {terminalTabs.map(tab => (
+              <div key={tab.id} className="session-card">
+                <span className="session-dot" />
+                <span className="session-name">{tab.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* Template Prompts */}
+        {/* Goal Input */}
+        <div className="automation-section">
+          <h3>Goal</h3>
+          <textarea
+            value={goal}
+            onChange={e => setGoal(e.target.value)}
+            placeholder="Describe what you want to build or fix across your sessions..."
+            disabled={!hasApiKey || isAnalyzing || isGenerating || dispatching}
+            rows={4}
+            className="goal-textarea"
+          />
           <div className="templates">
-            <h4>Quick Templates:</h4>
+            <span className="hint-text">Templates:</span>
             <div className="template-list">
-              {DEFAULT_PROMPTS.map((prompt, idx) => (
+              {TEMPLATES.map((t, i) => (
                 <button
-                  key={idx}
+                  key={i}
                   className="template-btn"
-                  onClick={() => useTemplate(prompt)}
-                  disabled={!hasApiKey || isAutomationRunning}
+                  onClick={() => setGoal(t)}
+                  disabled={!hasApiKey || isAnalyzing || dispatching}
                 >
-                  {prompt.length > 50 ? prompt.substring(0, 50) + '...' : prompt}
+                  {t.length > 48 ? t.slice(0, 48) + '…' : t}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Custom Task Section */}
-        <div className="automation-section">
-          <h3>Add Custom Task</h3>
-          <div className="add-task-form">
-            <input
-              type="text"
-              placeholder="Task name"
-              value={newTaskName}
-              onChange={(e) => setNewTaskName(e.target.value)}
-              disabled={!hasApiKey || isAutomationRunning}
-            />
-            <textarea
-              placeholder="Claude prompt..."
-              value={newTaskPrompt}
-              onChange={(e) => setNewTaskPrompt(e.target.value)}
-              disabled={!hasApiKey || isAutomationRunning}
-              rows={2}
-            />
+        {/* Complexity Analysis */}
+        {complexityAnalysis && (
+          <div className="automation-section complexity-section">
+            <div className="complexity-row">
+              <span className="complexity-label">Complexity</span>
+              <span className={`complexity-badge ${complexityAnalysis.complexity >= 7 ? 'high' : complexityAnalysis.complexity >= 4 ? 'medium' : 'low'}`}>
+                {complexityAnalysis.complexity}/10
+              </span>
+              <span className="agent-count-badge">{complexityAnalysis.agentCount} agents recommended</span>
+            </div>
+            <p className="complexity-reasoning">{complexityAnalysis.reasoning}</p>
             <button
-              className="add-btn"
-              onClick={addTask}
-              disabled={!hasApiKey || !newTaskName.trim() || !newTaskPrompt.trim() || isAutomationRunning}
+              className="generate-btn"
+              onClick={handleGenerateSubtasks}
+              disabled={isGenerating || !onGeneratePrompts}
             >
-              Add Task
+              {isGenerating ? 'Generating Subtasks…' : `Split into ${complexityAnalysis.agentCount} Subtasks`}
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Tasks List */}
-        {tasks.length > 0 && (
+        {/* Subtask Assignments */}
+        {subtasks.length > 0 && (
           <div className="automation-section">
-            <h3>Tasks Queue ({tasks.length})</h3>
-            <div className="tasks-list">
-              {tasks.map((task) => (
-                <div key={task.id} className={`task-item ${task.status}`}>
-                  <div className="task-header">
-                    <span className={`status-indicator ${task.status}`} />
-                    <span className="task-name">{task.name}</span>
-                    <button
-                      className="remove-btn"
-                      onClick={(e) => { e.stopPropagation(); setTasks(prev => prev.filter(t => t.id !== task.id)); }}
+            <h3>Task Distribution</h3>
+            <div className="subtasks-list">
+              {subtasks.map((st, i) => (
+                <div key={st.id} className={`subtask-card ${dispatchStatus[st.id] ?? ''}`}>
+                  <div className="subtask-header">
+                    <span className="subtask-index">#{i + 1}</span>
+                    <select
+                      className="terminal-assign-select"
+                      value={st.assignedTabId ?? ''}
+                      onChange={e => handleAssign(st.id, e.target.value || null)}
                     >
-                      x
-                    </button>
+                      <option value="">— Unassigned —</option>
+                      {terminalTabs.map(tab => (
+                        <option key={tab.id} value={tab.id}>{tab.title}</option>
+                      ))}
+                    </select>
+                    {dispatchStatus[st.id] === 'dispatched' && <span className="dispatch-badge dispatched">✓ Sent</span>}
+                    {dispatchStatus[st.id] === 'error' && <span className="dispatch-badge error-badge">✗ Failed</span>}
                   </div>
-                  <div className="task-prompt">{task.prompt}</div>
+                  <p className="subtask-prompt">{st.prompt}</p>
                 </div>
               ))}
             </div>
           </div>
         )}
+      </div>
 
-        {/* Control Buttons */}
-        <div className="automation-controls">
+      {/* Footer Controls */}
+      <div className="automation-footer">
+        {subtasks.length > 0 ? (
+          <button
+            className="dispatch-btn"
+            onClick={handleDispatch}
+            disabled={dispatching || allDispatched || !canDispatch}
+          >
+            {dispatching ? 'Dispatching…' : allDispatched ? '✓ Dispatched' : 'Dispatch to Sessions'}
+          </button>
+        ) : (
           <button
             className="start-btn"
-            onClick={startAllTasks}
-            disabled={!hasApiKey || !onStartAutomation || (tasks.length === 0 && !globalPrompt.trim()) || isGeneratingPrompts || isAnalyzing}
+            onClick={handleAnalyze}
+            disabled={!hasApiKey || !goal.trim() || isAnalyzing || isGenerating}
           >
-            {isAnalyzing ? 'Analyzing Complexity...' : isGeneratingPrompts ? 'Generating Agents...' : 'Start Automation'}
+            {isAnalyzing ? 'Analyzing…' : 'Analyze & Split Tasks'}
           </button>
-
-          {tasks.length > 0 && (
-            <button className="clear-btn" onClick={() => setTasks([])}>
-              Clear Queue
-            </button>
-          )}
-        </div>
+        )}
+        <button
+          className="broadcast-btn"
+          onClick={handleBroadcast}
+          disabled={!hasApiKey || !goal.trim() || dispatching}
+          title="Send the same goal to every open session at once"
+        >
+          Broadcast to All
+        </button>
       </div>
     </div>
   );

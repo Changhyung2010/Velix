@@ -10,25 +10,14 @@
 }
 
 .settings-modal {
-  background: var(--bg-secondary, #0f1419);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   width: 600px;
   max-width: 90vw;
   max-height: 80vh;
   overflow: hidden;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-.app.dark .settings-modal {
-  background: #0f1419;
-  border-color: #232d3b;
-}
-
-.app.light .settings-modal {
-  background: #ffffff;
-  border-color: #e2e8f0;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
 }
 
 .settings-header {
@@ -36,31 +25,23 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 24px;
-  border-bottom: 1px solid var(--border-light, #1a2332);
-}
-
-.app.light .settings-header {
-  border-bottom-color: #e2e8f0;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .settings-header h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
-  color: var(--text-primary, #e6edf3);
-}
-
-.app.light .settings-header h2 {
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .close-btn {
   background: none;
   border: 1px solid transparent;
   font-size: 20px;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 6px 10px;
   border-radius: 8px;
@@ -81,17 +62,12 @@
 }
 
 .settings-nav {
-  background: var(--bg-sidebar, #0a0e14);
-  border-right: 1px solid var(--border-light, #1a2332);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.app.light .settings-nav {
-  background: #f1f5f9;
-  border-right-color: #e2e8f0;
 }
 
 .nav-item {
@@ -100,9 +76,9 @@
   background: none;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   font-size: 13px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -110,7 +86,7 @@
 
 .nav-item:hover {
   background: var(--bg-hover);
-  color: var(--text-secondary, #9198a1);
+  color: var(--text-secondary);
   transform: translateX(2px);
 }
 
@@ -122,27 +98,13 @@
   box-shadow: inset 2px 0 0 var(--accent-primary);
 }
 
-.app.light .nav-item.active {
-  background: rgba(52, 88, 48, 0.1);
-  color: #345830;
-  border-color: rgba(52, 88, 48, 0.3);
-  box-shadow: inset 2px 0 0 #345830;
-}
-
-.app.dark .nav-item.active {
-  background: rgba(90, 158, 84, 0.15);
-  color: #5a9e54;
-  border-color: rgba(90, 158, 84, 0.3);
-  box-shadow: inset 2px 0 0 #5a9e54;
-}
-
 .settings-content {
   padding: 24px;
   overflow-y: auto;
 }
 
 .settings-description {
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 20px;
   line-height: 1.6;
@@ -150,37 +112,22 @@
 
 /* Provider Cards */
 .provider-card {
-  background: var(--bg-code, #0a0e14);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-code);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
   transition: all 0.2s ease;
 }
 
-.app.light .provider-card {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-}
-
 .provider-card:hover {
-  border-color: var(--border-light, #30363d);
+  border-color: var(--border-default);
 }
 
 .provider-card.active {
   border-color: var(--accent-primary);
   background: var(--bg-hover);
   box-shadow: 0 0 0 2px var(--glow-primary);
-}
-
-.app.light .provider-card.active {
-  border-color: rgba(52, 88, 48, 0.5);
-  background: rgba(52, 88, 48, 0.05);
-}
-
-.app.dark .provider-card.active {
-  border-color: rgba(90, 158, 84, 0.5);
-  background: rgba(90, 158, 84, 0.08);
 }
 
 .provider-header {
@@ -203,23 +150,11 @@
   accent-color: var(--accent-primary);
 }
 
-.app.light .provider-select input[type="radio"] {
-  accent-color: #345830;
-}
-
-.app.dark .provider-select input[type="radio"] {
-  accent-color: #5a9e54;
-}
-
 .provider-name {
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-primary, #e6edf3);
-}
-
-.app.light .provider-name {
-  color: #0f172a;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 .provider-badges {
@@ -233,7 +168,7 @@
   color: white;
   font-size: 10px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   padding: 4px 10px;
   border-radius: 6px;
   text-transform: uppercase;
@@ -245,7 +180,7 @@
   color: white;
   font-size: 9px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   padding: 3px 8px;
   border-radius: 6px;
   text-transform: uppercase;
@@ -255,8 +190,8 @@
 
 .provider-description {
   font-size: 11px;
-  color: var(--text-hint, #484f58);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
   margin: -4px 0 10px;
   line-height: 1.5;
 }
@@ -265,11 +200,7 @@
   display: grid;
   gap: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--border-light, #1a2332);
-}
-
-.app.light .provider-config {
-  border-top-color: #e2e8f0;
+  border-top: 1px solid var(--border-light);
 }
 
 .input-group {
@@ -281,10 +212,10 @@
 .input-group label {
   font-size: 10px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
 }
 
 .key-input-wrapper {
@@ -295,21 +226,14 @@
 .key-input-wrapper input,
 .input-group select {
   flex: 1;
-  background: var(--bg-input, #0d1117);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 13px;
-  color: var(--text-primary, #e6edf3);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   transition: all 0.2s ease;
-}
-
-.app.light .key-input-wrapper input,
-.app.light .input-group select {
-  background: #ffffff;
-  border-color: #e2e8f0;
-  color: #0f172a;
 }
 
 .key-input-wrapper input:focus,
@@ -319,34 +243,16 @@
   box-shadow: 0 0 0 3px var(--glow-primary);
 }
 
-.app.light .key-input-wrapper input:focus,
-.app.light .input-group select:focus {
-  border-color: #345830;
-  box-shadow: 0 0 0 3px rgba(52, 88, 48, 0.15);
-}
-
-.app.dark .key-input-wrapper input:focus,
-.app.dark .input-group select:focus {
-  border-color: #5a9e54;
-  box-shadow: 0 0 0 3px rgba(90, 158, 84, 0.2);
-}
-
 .toggle-visibility {
-  background: var(--bg-hover, #151b23);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 10px 16px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-secondary, #9198a1);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.app.light .toggle-visibility {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #475569;
 }
 
 .toggle-visibility:hover {
@@ -373,7 +279,7 @@
 .about-tab h3 {
   font-size: 24px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   background: var(--gradient-accent);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -382,7 +288,7 @@
 }
 
 .about-tab p {
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   margin: 0;
   font-size: 14px;
 }
@@ -390,8 +296,8 @@
 .about-tab .version {
   margin-top: 16px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-hint, #484f58);
+  font-family: var(--font-mono);
+  color: var(--text-hint);
 }
 
 /* Scrollbar */
@@ -404,12 +310,12 @@
 }
 
 .settings-content::-webkit-scrollbar-thumb {
-  background: var(--border-default, #232d3b);
+  background: var(--border-default);
   border-radius: 3px;
 }
 
 .settings-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-hint, #484f58);
+  background: var(--text-hint);
 }
 
 /* ========== APPEARANCE TAB ========== */
@@ -421,25 +327,20 @@
 }
 
 .appearance-section {
-  background: var(--bg-code, #0a0e14);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-code);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 20px;
-}
-
-.app.light .appearance-section {
-  background: #f8fafc;
-  border-color: #e2e8f0;
 }
 
 .appearance-section h4 {
   margin: 0 0 16px;
   font-size: 12px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
 }
 
 /* Theme Toggle */
@@ -455,16 +356,11 @@
   align-items: center;
   gap: 10px;
   padding: 20px 16px;
-  background: var(--bg-input, #0d1117);
-  border: 2px solid var(--border-default, #232d3b);
+  background: var(--bg-input);
+  border: 2px solid var(--border-default);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.app.light .theme-option {
-  background: #ffffff;
-  border-color: #e2e8f0;
 }
 
 .theme-option:hover {
@@ -481,16 +377,6 @@
   border-color: var(--accent-primary);
   background: var(--bg-active);
   box-shadow: 0 0 0 3px var(--glow-primary);
-}
-
-.app.light .theme-option.active {
-  background: rgba(52, 88, 48, 0.08);
-  border-color: #345830;
-}
-
-.app.dark .theme-option.active {
-  background: rgba(90, 158, 84, 0.12);
-  border-color: #5a9e54;
 }
 
 .theme-icon {
@@ -510,8 +396,8 @@
 .theme-label {
   font-size: 13px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-secondary, #9198a1);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
   transition: color 0.2s ease;
 }
 
@@ -530,7 +416,7 @@
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  border: 2px solid var(--border-default, #232d3b);
+  border: 2px solid var(--border-default);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -546,8 +432,8 @@
 
 .color-hint {
   font-size: 12px;
-  color: var(--text-hint, #484f58);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
   margin: 0;
 }
 
@@ -564,8 +450,8 @@
   border: none;
   cursor: pointer;
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--accent-primary, #0A8080);
+  font-family: var(--font-mono);
+  color: var(--accent-primary);
   padding: 0;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -579,16 +465,11 @@
 
 /* Step-by-step key retrieval section */
 .api-key-steps {
-  background: var(--bg-code, #151A15);
-  border: 1px solid var(--border-light, #1F2A1F);
+  background: var(--bg-code);
+  border: 1px solid var(--border-light);
   border-radius: 8px;
   padding: 12px 14px;
   margin-bottom: 2px;
-}
-
-.app.light .api-key-steps {
-  background: #f4f4ef;
-  border-color: #d5d5d0;
 }
 
 .steps-list {
@@ -601,37 +482,33 @@
 
 .steps-list li {
   font-size: 12px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-secondary, #B0B0B0);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
   line-height: 1.5;
-}
-
-.app.light .steps-list li {
-  color: #3d3d3d;
 }
 
 .steps-open-link {
   display: inline-block;
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--accent-primary, #0A8080);
+  font-family: var(--font-mono);
+  color: var(--accent-primary);
   text-decoration: none;
-  border: 1px solid var(--accent-primary, #0A8080);
+  border: 1px solid var(--accent-primary);
   border-radius: 5px;
   padding: 4px 10px;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .steps-open-link:hover {
-  background: var(--accent-primary, #0A8080);
+  background: var(--accent-primary);
   color: #fff;
 }
 
 /* Model hint in provider cards */
 .model-hint {
   font-size: 11px;
-  color: var(--text-hint, #484f58);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--text-hint);
+  font-family: var(--font-mono);
   font-style: italic;
   margin: 0;
 }
@@ -689,7 +566,7 @@
   .settings-nav {
     flex-direction: row;
     border-right: none;
-    border-bottom: 1px solid var(--border-light, #1a2332);
+    border-bottom: 1px solid var(--border-light);
     padding: 8px;
     gap: 4px;
     overflow-x: auto;

@@ -2,52 +2,35 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--bg-secondary, #0f1419);
-}
-
-.app.light .git-panel {
-  background-color: #ffffff;
+  background-color: var(--bg-secondary);
 }
 
 .git-header {
   height: 44px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--border-light, #1a2332);
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.app.light .git-header {
-  border-bottom-color: #e2e8f0;
 }
 
 .git-header h3 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-primary, #e6edf3);
-}
-
-.app.light .git-header h3 {
-  color: #0f172a;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 .refresh-btn {
-  background: var(--bg-hover, #151b23);
-  border: 1px solid var(--border-default, #232d3b);
-  color: var(--text-secondary, #9198a1);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   border-radius: 8px;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s ease;
-}
-
-.app.light .refresh-btn {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -68,20 +51,11 @@
 
 .git-info {
   padding: 14px 18px;
-  border-bottom: 1px solid var(--border-light, #262626);
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: var(--bg-hover);
-}
-
-.app.light .git-info {
-  border-bottom-color: #e5e5e5;
-  background: rgba(52, 88, 48, 0.04);
-}
-
-.app.dark .git-info {
-  background: rgba(90, 158, 84, 0.08);
 }
 
 .git-branch {
@@ -89,7 +63,7 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: var(--text-primary, #e6edf3);
+  color: var(--text-primary);
 }
 
 .branch-icon {
@@ -97,26 +71,10 @@
   color: var(--accent-primary);
 }
 
-.app.light .branch-icon {
-  color: #345830;
-}
-
-.app.dark .branch-icon {
-  color: #5a9e54;
-}
-
 .branch-name {
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   color: var(--accent-primary);
-}
-
-.app.light .branch-name {
-  color: #345830;
-}
-
-.app.dark .branch-name {
-  color: #5a9e54;
 }
 
 .git-sync {
@@ -124,27 +82,16 @@
   gap: 12px;
   font-size: 12px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 
 .ahead {
   color: var(--accent-primary);
 }
 
-.app.light .ahead {
-  color: #345830;
-}
-
-.app.dark .ahead {
-  color: #5a9e54;
-}
-
+/* Semantic red for behind */
 .behind {
-  color: #ff6b6b;
-}
-
-.app.light .behind {
-  color: #dc2626;
+  color: var(--accent-red);
 }
 
 .git-empty,
@@ -153,25 +100,21 @@
 .git-clean {
   padding: 48px 24px;
   text-align: center;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   font-size: 13px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 
+/* Semantic red for error detail */
 .error-detail {
   margin-top: 10px;
   font-size: 11px;
-  color: #ff6b6b;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: var(--accent-red);
+  font-family: var(--font-mono);
   background: rgba(255, 107, 107, 0.1);
   padding: 8px 12px;
   border-radius: 6px;
   display: inline-block;
-}
-
-.app.light .error-detail {
-  color: #dc2626;
-  background: rgba(220, 38, 38, 0.08);
 }
 
 .git-files-container {
@@ -185,28 +128,19 @@
   flex: 0 0 auto;
   max-height: 40%;
   overflow-y: auto;
-  border-bottom: 1px solid var(--border-light, #1a2332);
-}
-
-.app.light .git-files-list {
-  border-bottom-color: #e2e8f0;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .files-header {
   padding: 10px 18px;
   font-size: 10px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--text-muted, #6e7681);
-  background: var(--bg-sidebar, #0a0e14);
-  border-bottom: 1px solid var(--border-light, #1a2332);
-}
-
-.app.light .files-header {
-  background: #f1f5f9;
-  border-bottom-color: #e2e8f0;
+  color: var(--text-muted);
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .git-file-item {
@@ -225,72 +159,37 @@
   border-left-color: var(--accent-primary);
 }
 
-.app.light .git-file-item:hover {
-  background: rgba(52, 88, 48, 0.06);
-  border-left-color: rgba(52, 88, 48, 0.5);
-}
-
-.app.dark .git-file-item:hover {
-  background: rgba(90, 158, 84, 0.1);
-  border-left-color: rgba(90, 158, 84, 0.5);
-}
-
 .git-file-item.selected {
   background: var(--bg-active);
   border-left-color: var(--accent-primary);
 }
 
-.app.light .git-file-item.selected {
-  background: rgba(52, 88, 48, 0.12);
-  border-left-color: #345830;
-}
-
-.app.dark .git-file-item.selected {
-  background: rgba(90, 158, 84, 0.15);
-  border-left-color: #5a9e54;
-}
-
 .file-status {
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   width: 18px;
   text-align: center;
 }
 
+/* Semantic status colors */
 .status-modified {
-  color: #ffc66d;
-}
-
-.app.light .status-modified {
-  color: #ca8a04;
+  color: var(--accent-yellow);
 }
 
 .status-added {
   color: #3fb950;
 }
 
-.app.light .status-added {
-  color: #059669;
-}
-
 .status-deleted {
-  color: #ff6b6b;
-}
-
-.app.light .status-deleted {
-  color: #dc2626;
+  color: var(--accent-red);
 }
 
 .status-renamed {
-  color: #58a6ff;
-}
-
-.app.light .status-renamed {
-  color: #0284c7;
+  color: var(--accent-blue);
 }
 
 .status-untracked {
-  color: var(--text-hint, #484f58);
+  color: var(--text-hint);
 }
 
 .git-file-item.selected .file-status {
@@ -299,15 +198,11 @@
 
 .file-path {
   flex: 1;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-primary, #e6edf3);
-}
-
-.app.light .file-path {
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
 .staged-badge {
@@ -317,7 +212,7 @@
   border-radius: 6px;
   font-size: 9px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -335,27 +230,21 @@
 
 .diff-header {
   padding: 10px 18px;
-  background: var(--bg-sidebar, #0a0e14);
-  border-bottom: 1px solid var(--border-light, #1a2332);
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
   font-size: 12px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-primary, #e6edf3);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.app.light .diff-header {
-  background: #f1f5f9;
-  border-bottom-color: #e2e8f0;
-  color: #0f172a;
-}
-
 .view-file-btn {
   padding: 6px 16px;
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-weight: 600;
   background: var(--gradient-accent);
   color: white;
@@ -380,14 +269,10 @@
   overflow-y: auto;
   overflow-x: auto;
   padding: 12px 0;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
-  background: var(--bg-primary, #0a0e14);
-}
-
-.app.light .diff-content {
-  background: #f8fafc;
+  background: var(--bg-primary);
 }
 
 .split-diff-view {
@@ -409,16 +294,8 @@
   letter-spacing: 0.7px;
   padding: 3px 8px;
   border-radius: 6px;
-}
-
-.app.dark .split-diff-head-col {
-  background: rgba(90, 158, 84, 0.12);
-  color: #8dcf88;
-}
-
-.app.light .split-diff-head-col {
-  background: rgba(52, 88, 48, 0.1);
-  color: #345830;
+  background: var(--bg-hover);
+  color: var(--accent-primary);
 }
 
 .split-diff-hunk {
@@ -431,17 +308,9 @@
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-.app.dark .split-diff-hunk-header {
-  background: rgba(90, 158, 84, 0.12);
-  color: #7cc478;
-}
-
-.app.light .split-diff-hunk-header {
-  background: rgba(52, 88, 48, 0.09);
-  color: #345830;
+  font-family: var(--font-mono);
+  background: var(--bg-hover);
+  color: var(--accent-primary);
 }
 
 .split-diff-row {
@@ -463,14 +332,7 @@
   font-size: 11px;
   padding: 1px 6px 1px 0;
   user-select: none;
-}
-
-.app.dark .split-diff-line-num {
-  color: rgba(230, 237, 243, 0.35);
-}
-
-.app.light .split-diff-line-num {
-  color: rgba(15, 23, 42, 0.35);
+  color: var(--text-hint);
 }
 
 .split-diff-line-text {
@@ -481,63 +343,28 @@
 
 .split-diff-row.context .split-diff-cell {
   border: 1px solid transparent;
+  background: var(--bg-code);
 }
 
-.app.dark .split-diff-row.context .split-diff-cell {
-  background: rgba(255, 255, 255, 0.015);
-}
-
-.app.light .split-diff-row.context .split-diff-cell {
-  background: rgba(15, 23, 42, 0.02);
-}
-
+/* Semantic diff colors */
 .split-diff-cell.left.removed,
 .split-diff-cell.left.modified {
   border: 1px solid rgba(255, 107, 107, 0.35);
-}
-
-.app.dark .split-diff-cell.left.removed,
-.app.dark .split-diff-cell.left.modified {
-  background: rgba(255, 107, 107, 0.12);
-  color: #ffb2b2;
-}
-
-.app.light .split-diff-cell.left.removed,
-.app.light .split-diff-cell.left.modified {
-  background: rgba(220, 38, 38, 0.09);
-  color: #b91c1c;
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--accent-red);
 }
 
 .split-diff-cell.right.added,
 .split-diff-cell.right.modified {
   border: 1px solid rgba(63, 185, 80, 0.35);
-}
-
-.app.dark .split-diff-cell.right.added,
-.app.dark .split-diff-cell.right.modified {
-  background: rgba(63, 185, 80, 0.12);
-  color: #9be3a6;
-}
-
-.app.light .split-diff-cell.right.added,
-.app.light .split-diff-cell.right.modified {
-  background: rgba(5, 150, 105, 0.09);
-  color: #0f766e;
+  background: rgba(63, 185, 80, 0.1);
+  color: #3fb950;
 }
 
 .split-diff-cell.left.added,
 .split-diff-cell.right.removed {
   border: 1px dashed rgba(148, 163, 184, 0.28);
-}
-
-.app.dark .split-diff-cell.left.added,
-.app.dark .split-diff-cell.right.removed {
   background: rgba(148, 163, 184, 0.05);
-}
-
-.app.light .split-diff-cell.left.added,
-.app.light .split-diff-cell.right.removed {
-  background: rgba(148, 163, 184, 0.06);
 }
 
 .split-diff-empty {
@@ -553,40 +380,21 @@
   overflow-x: auto;
 }
 
+/* Semantic diff line colors */
 .diff-added {
   background: rgba(63, 185, 80, 0.15);
   color: #3fb950;
 }
 
-.app.light .diff-added {
-  background: rgba(5, 150, 105, 0.1);
-  color: #059669;
-}
-
 .diff-removed {
   background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
-}
-
-.app.light .diff-removed {
-  background: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
+  color: var(--accent-red);
 }
 
 .diff-hunk {
   background: var(--bg-hover);
   color: var(--accent-primary);
   font-weight: 600;
-}
-
-.app.light .diff-hunk {
-  background: rgba(52, 88, 48, 0.08);
-  color: #345830;
-}
-
-.app.dark .diff-hunk {
-  background: rgba(90, 158, 84, 0.1);
-  color: #5a9e54;
 }
 
 /* Scrollbar styling */
@@ -602,11 +410,11 @@
 
 .git-files-list::-webkit-scrollbar-thumb,
 .diff-content::-webkit-scrollbar-thumb {
-  background: var(--border-default, #232d3b);
+  background: var(--border-default);
   border-radius: 3px;
 }
 
 .git-files-list::-webkit-scrollbar-thumb:hover,
 .diff-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-hint, #484f58);
+  background: var(--text-hint);
 }

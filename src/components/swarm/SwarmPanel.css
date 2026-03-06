@@ -73,7 +73,7 @@
 }
 
 .spawn-input::placeholder {
-  color: var(--text-muted, var(--text-secondary));
+  color: var(--text-muted);
   opacity: 0.7;
 }
 
@@ -116,7 +116,7 @@
   padding: 6px 12px;
   background: rgba(239, 68, 68, 0.12);
   border-bottom: 1px solid rgba(239, 68, 68, 0.3);
-  color: var(--accent-red, #EF4444);
+  color: var(--accent-red);
   font-size: 12px;
   flex-shrink: 0;
 }
@@ -155,8 +155,8 @@
 .kill-all-btn {
   padding: 3px 8px;
   background: none;
-  border: 1px solid var(--accent-red, #EF4444);
-  color: var(--accent-red, #EF4444);
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
@@ -165,7 +165,7 @@
 }
 
 .kill-all-btn:hover {
-  background: var(--accent-red, #EF4444);
+  background: var(--accent-red);
   color: white;
 }
 

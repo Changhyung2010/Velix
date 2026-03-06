@@ -28,7 +28,11 @@
       "Bash(git submodule:*)",
       "Bash(git rm:*)",
       "Bash(git add:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(perl -i -pe:*)",
+      "Bash(claude --version)",
+      "Bash(npm config:*)",
+      "Bash(git -C /Users/changhyunglee/Vexilo/Velix diff HEAD electron/main.cjs)"
     ]
   }
 }

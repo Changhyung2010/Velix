@@ -307,6 +307,8 @@ function isAIRequest(input: string): boolean {
     'git', 'gitk', 'gitg',
     // Editors
     'vim', 'vi', 'nano', 'emacs', 'code', 'subl', 'atom',
+    // AI CLI tools
+    'claude', 'gemini', 'aider', 'codex',
     // System admin
     'sudo', 'su', 'passwd', 'chmod', 'chown', 'systemctl', 'service', 'journalctl',
     // Development tools
@@ -434,6 +436,7 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   const sessionIdRef = useRef<string>("");
   const unlistenOutputRef = useRef<UnlistenFn | null>(null);
   const unlistenExitRef = useRef<UnlistenFn | null>(null);
+  const isClaudeCodeRunningRef = useRef<boolean>(false);
 
   const [inputValue, setInputValue] = useState("");
   const [inputMode, setInputMode] = useState<"terminal" | "ai">("terminal");
@@ -567,65 +570,65 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Theme configurations
+    // Theme configurations — matched to the app's teal/forest design system
     const darkTheme = {
-      background: "#0d1117",
-      foreground: "#c9d1d9",
-      cursor: "#58a6ff",
-      cursorAccent: "#0d1117",
-      selectionBackground: "#264f78",
-      selectionForeground: "#ffffff",
-      black: "#484f58",
-      red: "#ff7b72",
-      green: "#3fb950",
-      yellow: "#d29922",
-      blue: "#58a6ff",
-      magenta: "#bc8cff",
-      cyan: "#39c5cf",
-      white: "#b1bac4",
-      brightBlack: "#6e7681",
-      brightRed: "#ffa198",
-      brightGreen: "#56d364",
-      brightYellow: "#e3b341",
-      brightBlue: "#79c0ff",
-      brightMagenta: "#d2a8ff",
-      brightCyan: "#56d4dd",
-      brightWhite: "#f0f6fc",
+      background: "#0C120C",            // --bg-terminal dark
+      foreground: "#D4D4D4",
+      cursor: "#0A8080",                // --accent-primary dark (teal)
+      cursorAccent: "#0C120C",
+      selectionBackground: "rgba(10, 128, 128, 0.28)",
+      selectionForeground: "#E8E8E8",
+      black: "#2A352A",
+      red: "#FF6B6B",                   // --accent-red dark
+      green: "#3FB950",
+      yellow: "#FFD93D",                // --accent-yellow dark
+      blue: "#0A8080",                  // teal for blue
+      magenta: "#9D7CD8",
+      cyan: "#14A0A0",                  // --accent-primary-light dark
+      white: "#B0B0B0",                 // --text-secondary dark
+      brightBlack: "#808080",           // --text-muted dark
+      brightRed: "#FF9090",
+      brightGreen: "#56D364",
+      brightYellow: "#FFE066",
+      brightBlue: "#14A0A0",
+      brightMagenta: "#C099FF",
+      brightCyan: "#1ABCAA",
+      brightWhite: "#E8E8E8",           // --text-primary dark
     };
 
     const lightTheme = {
-      background: "#ffffff",
-      foreground: "#24292f",
-      cursor: "#0969da",
-      cursorAccent: "#ffffff",
-      selectionBackground: "#0969da33",
-      selectionForeground: "#24292f",
-      black: "#24292f",
-      red: "#cf222e",
+      background: "#F5F5F0",            // --bg-terminal light
+      foreground: "#1A1A1A",
+      cursor: "#065E5E",                // --accent-primary light (teal)
+      cursorAccent: "#F5F5F0",
+      selectionBackground: "rgba(6, 94, 94, 0.18)",
+      selectionForeground: "#0C120C",
+      black: "#0C120C",
+      red: "#DC2626",                   // --accent-red light
       green: "#116329",
-      yellow: "#4d2d00",
-      blue: "#0969da",
-      magenta: "#8250df",
-      cyan: "#1b7c83",
-      white: "#6e7781",
-      brightBlack: "#57606a",
-      brightRed: "#a40e26",
-      brightGreen: "#1a7f37",
-      brightYellow: "#633c01",
-      brightBlue: "#218bff",
-      brightMagenta: "#a475f9",
-      brightCyan: "#3192aa",
-      brightWhite: "#8c959f",
+      yellow: "#CA8A04",                // --accent-yellow light
+      blue: "#065E5E",                  // teal for blue
+      magenta: "#8250DF",
+      cyan: "#088080",                  // --accent-cyan light
+      white: "#3D3D3D",                 // --text-secondary light
+      brightBlack: "#5A5A5A",           // --text-muted light
+      brightRed: "#A40E26",
+      brightGreen: "#1A7F37",
+      brightYellow: "#633C01",
+      brightBlue: "#088080",
+      brightMagenta: "#A475F9",
+      brightCyan: "#047A7A",
+      brightWhite: "#0C120C",
     };
 
     // Create terminal instance
     const term = new Terminal({
-      cursorBlink: false,  // No cursor in output area - only in input box
+      cursorBlink: true,
       cursorStyle: "bar",
       fontSize: 13,
-      fontFamily: "'SF Mono', 'JetBrains Mono', 'Menlo', 'Monaco', monospace",
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Menlo', 'Monaco', monospace",
       letterSpacing: 0,
-      lineHeight: 1.5,
+      lineHeight: 1.6,
       allowProposedApi: true,
       scrollback: 10000,
       theme: theme === "light" ? lightTheme : darkTheme,
@@ -660,13 +663,15 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
               data.includes('Claude Code') ||
               data.includes('How can I help you') ||
               data.includes('I can help with')) {
+              isClaudeCodeRunningRef.current = true;
               setHideInputCard(true);
             }
           }
 
-          // Show input card again when Claude Code exits
-          if (data.includes('exit') || data.includes('quit') || data.includes('bye')) {
-            setTimeout(() => setHideInputCard(false), 500);
+          // Show input card again when Claude Code explicitly says goodbye (/exit command)
+          if (isClaudeCodeRunningRef.current && /goodbye|Goodbye/i.test(data)) {
+            isClaudeCodeRunningRef.current = false;
+            setTimeout(() => setHideInputCard(false), 300);
           }
         }
       });
@@ -675,6 +680,9 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
       unlistenExitRef.current = await listen<PtyExit>("pty-exit", (event) => {
         if (event.payload.session_id === sessionIdRef.current) {
           term.writeln("\r\n\x1b[90m[Process exited]\x1b[0m");
+          // Reset Claude Code state so input card is always visible after session restart
+          isClaudeCodeRunningRef.current = false;
+          setHideInputCard(false);
           // Optionally restart the shell
           setTimeout(async () => {
             try {
@@ -1187,7 +1195,17 @@ No project is loaded. Tell the user to open a project folder so you can see thei
 
     } catch (error) {
       console.error('AI Request Error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to get AI response';
+      // Electron IPC serializes errors across context boundaries, which can break instanceof.
+      // Extract the message from whatever shape the error arrives in.
+      const errorMessage = (() => {
+        if (error instanceof Error) return error.message;
+        if (error && typeof error === 'object') {
+          const msg = (error as Record<string, unknown>).message;
+          if (typeof msg === 'string' && msg) return msg;
+        }
+        if (typeof error === 'string' && error) return error;
+        return 'Failed to get AI response';
+      })();
       if (typingInterval) {
         clearInterval(typingInterval);
         term.write(`\r\x1b[K`);
@@ -1565,7 +1583,20 @@ No project is loaded. Tell the user to open a project folder so you can see thei
 
       {/* Simple header at top */}
       <div className="simple-header">
-        <span>~/{cwd?.split('/').pop() || 'Vexilo/Velix'}</span>
+        <span className="simple-header-icon">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+        </span>
+        <div className="simple-header-path">
+          <span className="simple-header-path-segment">~</span>
+          <span className="simple-header-sep">/</span>
+          <span className="simple-header-path-segment active">
+            {cwd?.split('/').pop() || 'terminal'}
+          </span>
+        </div>
+        <span className="simple-header-badge">sh</span>
       </div>
 
       {/* Terminal output area */}

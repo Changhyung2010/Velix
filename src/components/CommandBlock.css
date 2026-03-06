@@ -1,6 +1,6 @@
 .command-block {
-    background: #121621;
-    border: 1px solid #1f2636;
+    background: var(--bg-code);
+    border: 1px solid var(--border-light);
     border-radius: 12px;
     margin-bottom: 8px;
     overflow: hidden;
@@ -9,12 +9,12 @@
 }
 
 .command-block:hover {
-    border-color: #2a3548;
+    border-color: var(--border-default);
 }
 
 .command-block.error {
-    border-color: #5a3a3a;
-    background: linear-gradient(135deg, #1a1418 0%, #121621 100%);
+    border-color: var(--accent-red);
+    background: var(--bg-code);
 }
 
 .block-top-bar {
@@ -22,8 +22,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 6px 12px;
-    background: #0e1118;
-    border-bottom: 1px solid #1a1f2a;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-light);
     opacity: 0;
     transition: opacity 0.15s;
 }
@@ -34,8 +34,8 @@
 
 .block-timestamp {
     font-size: 11px;
-    color: #5a657a;
-    font-family: 'SF Mono', 'JetBrains Mono', monospace;
+    color: var(--text-hint);
+    font-family: var(--font-mono);
 }
 
 .block-actions {
@@ -44,28 +44,30 @@
 }
 
 .action-btn {
-    background: #1f2636;
-    border: 1px solid #2a3140;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-default);
     border-radius: 6px;
     padding: 4px 8px;
     font-size: 12px;
-    color: #9aa6ba;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.15s;
 }
 
 .action-btn:hover {
-    background: #2a3140;
-    color: #c7d0e0;
+    background: var(--bg-active);
+    color: var(--text-primary);
 }
 
 .action-btn.ask-ai {
-    background: linear-gradient(135deg, #2a3a5a 0%, #1f2636 100%);
-    border-color: #3a4a6a;
+    background: var(--bg-hover);
+    border-color: var(--border-glow);
+    color: var(--accent-primary);
 }
 
 .action-btn.ask-ai:hover {
-    background: linear-gradient(135deg, #3a4a6a 0%, #2a3a5a 100%);
+    background: var(--bg-active);
+    border-color: var(--accent-primary);
 }
 
 .block-command {
@@ -73,41 +75,41 @@
     align-items: flex-start;
     gap: 10px;
     padding: 12px 14px;
-    font-family: 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
 }
 
 .cmd-prompt {
-    color: #7ed6a8;
+    color: var(--accent-primary);
     font-weight: 600;
     flex-shrink: 0;
 }
 
 .cmd-text {
-    color: #e5ebf5;
+    color: var(--text-primary);
     word-break: break-all;
 }
 
 .block-output {
     padding: 12px 14px;
     padding-left: 36px;
-    background: #0b0f16;
-    border-top: 1px solid #1a1f2a;
+    background: var(--bg-terminal);
+    border-top: 1px solid var(--border-light);
     max-height: 300px;
     overflow-y: auto;
 }
 
 .block-output pre {
     margin: 0;
-    font-family: 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
-    color: #c6cfdf;
+    color: var(--text-secondary);
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .block-output.error-output pre {
-    color: #f87171;
+    color: var(--accent-red);
 }
 
 /* Context Menu */
@@ -122,8 +124,8 @@
     top: 50%;
     right: 12px;
     transform: translateY(-50%);
-    background: #161b26;
-    border: 1px solid #2a3140;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
     border-radius: 10px;
     padding: 6px;
     z-index: 100;
@@ -140,7 +142,7 @@
     background: none;
     border: none;
     border-radius: 8px;
-    color: #c7d0e0;
+    color: var(--text-secondary);
     font-size: 13px;
     cursor: pointer;
     text-align: left;
@@ -148,21 +150,21 @@
 }
 
 .context-menu button:hover {
-    background: #1f2636;
+    background: var(--bg-hover);
 }
 
 .context-menu hr {
     border: none;
-    border-top: 1px solid #2a3140;
+    border-top: 1px solid var(--border-light);
     margin: 6px 0;
 }
 
 .context-menu .ai-option {
-    color: #8b9eff;
+    color: var(--accent-primary);
 }
 
 .context-menu .ai-option:hover {
-    background: linear-gradient(135deg, #1f2a4a 0%, #1f2636 100%);
+    background: var(--bg-active);
 }
 
 /* Scrollbar styling */
@@ -175,10 +177,10 @@
 }
 
 .block-output::-webkit-scrollbar-thumb {
-    background: #2a3140;
+    background: var(--border-default);
     border-radius: 3px;
 }
 
 .block-output::-webkit-scrollbar-thumb:hover {
-    background: #3a4150;
+    background: var(--text-hint);
 }

@@ -14,7 +14,7 @@
 }
 
 .agent-terminal:hover {
-  border-color: var(--border-hover, var(--accent-primary));
+  border-color: var(--accent-primary);
 }
 
 .agent-terminal.finished {
@@ -27,7 +27,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: var(--bg-sidebar, var(--bg-secondary));
+  background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-default);
   min-height: 36px;
   flex-shrink: 0;
@@ -115,7 +115,7 @@
 .terminal-window {
   flex: 1;
   padding: 8px 10px;
-  background: var(--bg-code, #0a0a0a);
+  background: var(--bg-code);
   color: var(--text-primary);
   overflow-y: auto;
   height: 160px;
@@ -131,7 +131,7 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #d4d4d4;
+  color: var(--text-secondary);
   padding: 0;
 }
 
@@ -191,12 +191,3 @@
   cursor: not-allowed;
 }
 
-/* ── Dark theme overrides ────────────────────────── */
-.agent-terminal.dark .terminal-window {
-  background: #0d1117;
-  color: #e6edf3;
-}
-
-.agent-terminal.dark .terminal-line {
-  color: #e6edf3;
-}

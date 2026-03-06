@@ -166,6 +166,18 @@ fn pty_create(
     // Get the shell path - use user's default shell or fallback to zsh
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
+    // Get the full PATH from the user's login shell so tools installed via
+    // nvm, homebrew, cargo, etc. are available in the PTY terminal.
+    let full_path = std::process::Command::new(&shell)
+        .args(["-l", "-c", "echo $PATH"])
+        .env("HOME", dirs_or_home())
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
+
     let mut cmd = CommandBuilder::new(&shell);
     cmd.arg("-l"); // Login shell to load user's profile
 
@@ -173,6 +185,7 @@ fn pty_create(
     let working_dir = cwd.unwrap_or_else(|| dirs_or_home());
     cmd.cwd(&working_dir);
 
+    cmd.env("PATH", &full_path);
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("LANG", "en_US.UTF-8");
@@ -1264,6 +1277,151 @@ async fn ask_claude(prompt: String, state: tauri::State<'_, AppState>) -> Result
     Ok(content.to_string())
 }
 
+// ==================== Generic AI Chat Command ====================
+
+#[derive(serde::Deserialize)]
+struct AiChatMessage {
+    role: String,
+    content: String,
+}
+
+/// Provider-agnostic AI chat command. Mirrors the Electron `aiChat` handler.
+#[tauri::command]
+async fn ai_chat(
+    provider: String,
+    model: String,
+    api_key: String,
+    messages: Vec<AiChatMessage>,
+    system: Option<String>,
+    max_tokens: Option<u32>,
+) -> Result<String, String> {
+    let max = max_tokens.unwrap_or(4096);
+    let client = reqwest::Client::new();
+
+    if provider == "claude" {
+        let msgs: Vec<serde_json::Value> = messages
+            .iter()
+            .map(|m| serde_json::json!({"role": m.role, "content": m.content}))
+            .collect();
+        let mut body = serde_json::json!({
+            "model": model,
+            "max_tokens": max,
+            "messages": msgs,
+        });
+        if let Some(sys) = system {
+            body["system"] = serde_json::Value::String(sys);
+        }
+        let response = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Anthropic request failed: {}", e))?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(format!("Anthropic API error ({}): {}", status, text));
+        }
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Anthropic response: {}", e))?;
+        return Ok(data["content"][0]["text"]
+            .as_str()
+            .unwrap_or("")
+            .to_string());
+    }
+
+    if provider == "gemini" {
+        let gemini_msgs: Vec<serde_json::Value> = messages
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "role": if m.role == "assistant" { "model" } else { "user" },
+                    "parts": [{"text": m.content}]
+                })
+            })
+            .collect();
+        let mut body = serde_json::json!({"contents": gemini_msgs});
+        if let Some(sys) = system {
+            body["systemInstruction"] = serde_json::json!({"parts": [{"text": sys}]});
+        }
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+            model, api_key
+        );
+        let response = client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Google request failed: {}", e))?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(format!("Google API error ({}): {}", status, text));
+        }
+        let data: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Google response: {}", e))?;
+        return Ok(data["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .unwrap_or("")
+            .to_string());
+    }
+
+    // OpenAI-compatible providers
+    let base_url = match provider.as_str() {
+        "chatgpt" => "https://api.openai.com/v1",
+        "deepseek" => "https://api.deepseek.com/v1",
+        "groq" => "https://api.groq.com/openai/v1",
+        "mistral" => "https://api.mistral.ai/v1",
+        "minimax" => "https://api.minimax.chat/v1",
+        "kimi" => "https://api.moonshot.cn/v1",
+        "glm4" => "https://open.bigmodel.cn/api/paas/v4",
+        _ => return Err(format!("Unsupported AI provider: {}", provider)),
+    };
+
+    let mut chat_msgs: Vec<serde_json::Value> = Vec::new();
+    if let Some(sys) = system {
+        chat_msgs.push(serde_json::json!({"role": "system", "content": sys}));
+    }
+    for m in &messages {
+        chat_msgs.push(serde_json::json!({"role": m.role, "content": m.content}));
+    }
+    let body = serde_json::json!({
+        "model": model,
+        "messages": chat_msgs,
+        "max_tokens": max,
+    });
+    let response = client
+        .post(format!("{}/chat/completions", base_url))
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("{} request failed: {}", provider, e))?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("{} API error ({}): {}", provider, status, text));
+    }
+    let data: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse {} response: {}", provider, e))?;
+    Ok(data["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
+}
+
 // ==================== OpenCode Server Management ====================
 
 /// Try to locate the `bun` executable in common paths.
@@ -1423,6 +1581,7 @@ pub fn run() {
             pty_resize,
             pty_kill,
             ask_claude,
+            ai_chat,
             read_project_source_files,
             start_opencode_server,
             stop_opencode_server,

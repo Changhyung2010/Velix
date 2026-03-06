@@ -5,9 +5,6 @@ import {
   readTextFile,
   type DirEntry,
   invoke,
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
 } from "./platform/native";
 import "./App.css";
 import { Settings, AIConfig, AI_PROVIDERS, AIProvider } from "./components/Settings";
@@ -73,9 +70,11 @@ function App() {
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
+  const [showVoiceSetup, setShowVoiceSetup] = useState(false);
   const [showAutomation, setShowAutomation] = useState(false);
   const [showSwarm, setShowSwarm] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
+  const voiceSetupRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_isAIProcessing, setIsAIProcessing] = useState(false);
   const [configuredProviders, setConfiguredProviders] = useState<Array<{ id: string; name: string }>>([]);
@@ -130,6 +129,13 @@ function App() {
   // Resizable panel widths (percentages)
   const [terminalWidth, setTerminalWidth] = useState(50);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Per-terminal widths (%) when multiple terminals are open in split view
+  const [splitWidths, setSplitWidths] = useState<number[]>([100]);
+  // Reset to equal distribution whenever the tab count changes
+  useEffect(() => {
+    setSplitWidths(terminalTabs.map(() => 100 / terminalTabs.length));
+  }, [terminalTabs.length]);
 
   // Get active tab content
   const activeTab = openTabs.find(t => t.id === activeTabId);
@@ -226,44 +232,6 @@ function App() {
       }
 
       setConfiguredProviders(configured);
-
-      // --- NEW: Automatically test configured models ---
-      for (const provider of configured) {
-        try {
-          console.log(`Auto-testing provider ${provider.id}...`);
-          const testStart = performance.now();
-
-          // Request a quick, minimal generation to ensure it works
-          const result = await aiService.chat(
-            [{ role: "user", content: "Say 'ok'." }],
-            {
-              model: AI_PROVIDERS.find(p => p.id === provider.id)?.models[0],
-              maxTokens: 5
-            }
-          );
-
-          const testMs = Math.round(performance.now() - testStart);
-          console.log(`Provider ${provider.id} tested successfully in ${testMs}ms. Response:`, result.content);
-        } catch (error) {
-          console.error(`Provider ${provider.id} failed the auto-test!`, error);
-
-          // Native desktop notification if permission granted
-          try {
-            let permissionGranted = await isPermissionGranted();
-            if (!permissionGranted) {
-              permissionGranted = (await requestPermission()) === 'granted';
-            }
-            if (permissionGranted) {
-              await sendNotification({
-                title: 'AI Provider Issue',
-                body: `The ${provider.name} AI doesn't seem to be working. Check your API key.`
-              });
-            }
-          } catch (notifErr) {
-            console.warn('Could not send native notification:', notifErr);
-          }
-        }
-      }
     };
     initializeAI();
 
@@ -292,19 +260,20 @@ function App() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [addTerminalTab, closeTerminalTab, terminalTabs.length, activeTerminalId]);
 
-  // Handle panel resize
+  // Handle editor/terminal panel resize
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
 
     const startX = e.clientX;
     const startWidth = terminalWidth;
-    const containerWidth = (e.target as HTMLElement).parentElement?.parentElement?.offsetWidth || window.innerWidth;
+    // The resize handle is a direct child of .terminal-pane
+    const containerWidth = (e.target as HTMLElement).parentElement?.offsetWidth || window.innerWidth;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
       const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = Math.min(Math.max(startWidth + deltaPercent, 20), 80);
+      const newWidth = Math.min(Math.max(startWidth + deltaPercent, 15), 75);
       setTerminalWidth(newWidth);
     };
 
@@ -321,6 +290,45 @@ function App() {
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   }, [terminalWidth]);
+
+  // Drag handler for resizing individual split-terminal panes
+  const handleSplitResizeStart = useCallback((e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startX = e.clientX;
+    const startWidths = [...splitWidths];
+    const containerWidth =
+      (e.target as HTMLElement).closest('.terminal-body')?.clientWidth || window.innerWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaPercent = (deltaX / containerWidth) * 100;
+      const newLeft = startWidths[index] + deltaPercent;
+      const newRight = startWidths[index + 1] - deltaPercent;
+      const minPanelWidth = 10; // minimum 10% per terminal
+      if (newLeft >= minPanelWidth && newRight >= minPanelWidth) {
+        setSplitWidths(prev => {
+          const next = [...prev];
+          next[index] = newLeft;
+          next[index + 1] = newRight;
+          return next;
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [splitWidths]);
 
   // Handle AI requests from the terminal with full project context
   const handleAIRequest = useCallback(async (prompt: string) => {
@@ -568,6 +576,18 @@ Working directory: ${currentDir || 'unknown'}`;
     const interval = setInterval(loadGitChanges, 5000);
     return () => clearInterval(interval);
   }, [currentDir]);
+
+  // Close voice setup popup when clicking outside
+  useEffect(() => {
+    if (!showVoiceSetup) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (voiceSetupRef.current && !voiceSetupRef.current.contains(e.target as Node)) {
+        setShowVoiceSetup(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVoiceSetup]);
 
   const loadDirectory = async (path: string): Promise<FileNode[]> => {
     try {
@@ -900,11 +920,25 @@ Working directory: ${currentDir || 'unknown'}`;
       <div key={file.path}>
         <div
           className={`tree-item ${file.isDirectory ? "folder" : "file"} ${activeFile === file.path ? "active" : ""}`}
-          style={{ paddingLeft: `${12 + depth * 16}px` }}
+          style={{ paddingLeft: `${10 + depth * 14}px` }}
           onClick={() => handleFileClick(file)}
         >
-          <span className={`item-icon ${file.isDirectory && file.isOpen ? "open" : ""}`}>
-            {file.isDirectory ? (file.isLoading ? "..." : file.isOpen ? "v" : ">") : ""}
+          <span className="item-icon">
+            {file.isDirectory ? (
+              file.isLoading ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{opacity: 0.5}}>
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+              ) : file.isOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 6 15 12 9 18"/>
+                </svg>
+              )
+            ) : null}
           </span>
           <span className="item-name">{file.name}</span>
         </div>
@@ -947,261 +981,385 @@ Working directory: ${currentDir || 'unknown'}`;
 
   return (
     <div className={`app ${theme}`}>
-      {/* Sidebar */}
+      {/* Sidebar: activity bar + explorer panel */}
       <aside className="sidebar">
-        <div className="sidebar-header">
-          <button className="project-btn" onClick={handleOpenProject}>
-            <span className="folder-icon">+</span>
-            {currentDir ? currentDir.split("/").pop() : "Open Project..."}
-          </button>
-        </div>
-        <div className="file-tree">
-          {!currentDir && <div className="empty-state">No project open</div>}
-          {renderFileTree(projectFiles)}
-        </div>
-        <div className="sidebar-tools">
-          <button
-            className={`tool-btn ${showVoiceChat ? "active" : ""}`}
-            onClick={() => {
-              setShowVoiceChat(!showVoiceChat);
-              if (!showVoiceChat) {
-                setShowGitPanel(false);
-                setShowSearchPanel(false);
+        {/* Narrow activity bar with icon buttons */}
+        <div className="activity-bar">
+          <div className="activity-top">
+            <button
+              className={`activity-btn ${!hasRightPanel ? 'active' : ''}`}
+              title="Explorer"
+              onClick={() => {
                 setShowToolPanel(false);
-                setShowAutomation(false);
-              }
-            }}
-            disabled={!openaiApiKey}
-            title={!openaiApiKey ? "Voice requires OpenAI API key. Configure ChatGPT in Settings." : "Voice Chat"}
-          >
-            <span className="tool-icon">V</span><span>Voice</span>
-          </button>
-          <button
-            className={`tool-btn ${showGitPanel ? "active" : ""}`}
-            onClick={() => {
-              setShowGitPanel(!showGitPanel);
-              if (!showGitPanel) {
-                setShowVoiceChat(false);
                 setShowSearchPanel(false);
-                setShowToolPanel(false);
-                setShowAutomation(false);
-              }
-            }}
-          >
-            <span className="tool-icon">G</span><span>Git</span>
-          </button>
-          <button
-            className={`tool-btn ${showSearchPanel ? "active" : ""}`}
-            onClick={() => {
-              setShowSearchPanel(!showSearchPanel);
-              if (!showSearchPanel) {
-                setShowVoiceChat(false);
                 setShowGitPanel(false);
-                setShowToolPanel(false);
-                setShowAutomation(false);
-              }
-            }}
-          >
-            <span className="tool-icon">S</span><span>Search</span>
-          </button>
-          <button
-            className={`tool-btn ${showToolPanel ? "active" : ""}`}
-            onClick={() => {
-              setShowToolPanel(!showToolPanel);
-              if (!showToolPanel) {
                 setShowVoiceChat(false);
-                setShowGitPanel(false);
-                setShowSearchPanel(false);
                 setShowAutomation(false);
-              }
-            }}
-          >
-            <span className="tool-icon">T</span><span>Tools</span>
-          </button>
-          <button
-            className={`tool-btn automation-btn ${showAutomation ? "active" : ""}`}
-            onClick={() => {
-              setShowAutomation(!showAutomation);
-              if (!showAutomation) {
-                setShowVoiceChat(false);
-                setShowGitPanel(false);
-                setShowSearchPanel(false);
-                setShowToolPanel(false);
                 setShowSwarm(false);
-              }
-            }}
-            disabled={!aiConfig?.apiKey}
-            title={!aiConfig?.apiKey ? "Automation requires an API key. Add one in Settings." : "Automation Claude Code - Run multiple AI agents automatically"}
-          >
-            <span className="tool-icon">A</span><span>Auto</span>
-          </button>
-          <button
-            className={`tool-btn swarm-btn ${showSwarm ? "active" : ""}`}
-            onClick={() => {
-              setShowSwarm(!showSwarm);
-              if (!showSwarm) {
-                setShowVoiceChat(false);
-                setShowGitPanel(false);
-                setShowSearchPanel(false);
-                setShowToolPanel(false);
-                setShowAutomation(false);
-              }
-            }}
-            disabled={!aiConfig?.apiKey || !currentDir}
-            title={!aiConfig?.apiKey ? "Swarm requires an API key. Add one in Settings." : !currentDir ? "Swarm requires an open project. Open a project first." : "Claude Swarm - Advanced multi-agent orchestration"}
-          >
-            <span className="tool-icon">W</span><span>Swarm</span>
-          </button>
-          <button className="tool-btn" onClick={() => setShowSettings(true)}>
-            <span className="tool-icon">S</span><span>Settings</span>
-          </button>
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3h6l2 3h10a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+              </svg>
+            </button>
+          </div>
+
+          <div className="activity-middle">
+            {/* Voice button — shows setup popup when no API key configured */}
+            <div className="activity-btn-wrap" ref={voiceSetupRef}>
+              <button
+                className={`activity-btn ${showVoiceChat ? 'active' : ''} ${!openaiApiKey ? 'needs-setup' : ''}`}
+                onClick={() => {
+                  if (!openaiApiKey) {
+                    setShowVoiceSetup(v => !v);
+                    return;
+                  }
+                  setShowVoiceSetup(false);
+                  setShowVoiceChat(!showVoiceChat);
+                  if (!showVoiceChat) { setShowGitPanel(false); setShowSearchPanel(false); setShowToolPanel(false); setShowAutomation(false); setShowSwarm(false); }
+                }}
+                title={openaiApiKey ? "Voice Chat" : "Voice Chat — setup required"}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+                {!openaiApiKey && <span className="activity-btn-badge" />}
+              </button>
+
+              {showVoiceSetup && !openaiApiKey && (
+                <div className="voice-setup-popup">
+                  <div className="voice-setup-header">
+                    <div className="voice-setup-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                      </svg>
+                    </div>
+                    <span className="voice-setup-title">Voice Chat</span>
+                    <button className="voice-setup-close" onClick={() => setShowVoiceSetup(false)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="voice-setup-desc">
+                    Voice Chat requires an OpenAI API key. Here's how to get started:
+                  </p>
+                  <ol className="voice-setup-steps">
+                    <li>
+                      <span className="voice-setup-step-num">1</span>
+                      <span>Open <strong>Settings</strong> below</span>
+                    </li>
+                    <li>
+                      <span className="voice-setup-step-num">2</span>
+                      <span>Select <strong>ChatGPT</strong> as your AI provider</span>
+                    </li>
+                    <li>
+                      <span className="voice-setup-step-num">3</span>
+                      <span>Paste your <strong>OpenAI API key</strong></span>
+                    </li>
+                  </ol>
+                  <button
+                    className="voice-setup-action-btn"
+                    onClick={() => { setShowSettings(true); setShowVoiceSetup(false); }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Open Settings
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              className={`activity-btn ${showGitPanel ? 'active' : ''}`}
+              onClick={() => {
+                setShowGitPanel(!showGitPanel);
+                if (!showGitPanel) { setShowVoiceChat(false); setShowSearchPanel(false); setShowToolPanel(false); setShowAutomation(false); setShowSwarm(false); }
+              }}
+              title="Git"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="6" y1="3" x2="6" y2="15"/>
+                <circle cx="18" cy="6" r="3"/>
+                <circle cx="6" cy="18" r="3"/>
+                <path d="M18 9a9 9 0 0 1-9 9"/>
+              </svg>
+            </button>
+
+            <button
+              className={`activity-btn ${showSearchPanel ? 'active' : ''}`}
+              onClick={() => {
+                setShowSearchPanel(!showSearchPanel);
+                if (!showSearchPanel) { setShowVoiceChat(false); setShowGitPanel(false); setShowToolPanel(false); setShowAutomation(false); setShowSwarm(false); }
+              }}
+              title="Search"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+
+            <button
+              className={`activity-btn ${showToolPanel ? 'active' : ''}`}
+              onClick={() => {
+                setShowToolPanel(!showToolPanel);
+                if (!showToolPanel) { setShowVoiceChat(false); setShowGitPanel(false); setShowSearchPanel(false); setShowAutomation(false); setShowSwarm(false); }
+              }}
+              title="Tools"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+              </svg>
+            </button>
+
+            <button
+              className={`activity-btn ${showAutomation ? 'active' : ''}`}
+              onClick={() => {
+                setShowAutomation(!showAutomation);
+                if (!showAutomation) { setShowVoiceChat(false); setShowGitPanel(false); setShowSearchPanel(false); setShowToolPanel(false); setShowSwarm(false); }
+              }}
+              disabled={!aiConfig?.apiKey}
+              title={!aiConfig?.apiKey ? "Automation requires an API key. Add one in Settings." : "Automation — Run multiple AI agents automatically"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </button>
+
+            <button
+              className={`activity-btn ${showSwarm ? 'active' : ''}`}
+              onClick={() => {
+                setShowSwarm(!showSwarm);
+                if (!showSwarm) { setShowVoiceChat(false); setShowGitPanel(false); setShowSearchPanel(false); setShowToolPanel(false); setShowAutomation(false); }
+              }}
+              disabled={!aiConfig?.apiKey || !currentDir}
+              title={!aiConfig?.apiKey ? "Swarm requires an API key. Add one in Settings." : !currentDir ? "Swarm requires an open project." : "Swarm — Multi-agent orchestration"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="5" r="2.5"/>
+                <circle cx="5" cy="19" r="2.5"/>
+                <circle cx="19" cy="19" r="2.5"/>
+                <line x1="12" y1="7.5" x2="12" y2="12"/>
+                <line x1="12" y1="12" x2="5" y2="16.5"/>
+                <line x1="12" y1="12" x2="19" y2="16.5"/>
+              </svg>
+            </button>
+          </div>
+
+          <div className="activity-bottom">
+            <button className="activity-btn" onClick={() => setShowSettings(true)} title="Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Explorer panel: project name + file tree */}
+        <div className="explorer-panel">
+          <div className="explorer-header">
+            <span className="explorer-title">
+              {currentDir ? currentDir.split("/").pop()?.toUpperCase() : "EXPLORER"}
+            </span>
+            <button className="explorer-open-btn" onClick={handleOpenProject} title="Open Folder">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
+          <div className="file-tree">
+            {!currentDir && <div className="empty-state">Open a project to get started</div>}
+            {renderFileTree(projectFiles)}
+          </div>
         </div>
       </aside>
 
-      {/* Main content area: terminal + optional right panel */}
+      {/* Main content area: editor + terminal + optional right panel */}
       <main className="main-split">
-        {/* Terminal pane */}
+        {/* Terminal pane — horizontal split: editor left, terminal right */}
         <div className="terminal-pane">
 
-          {/* Editor section — visible when one or more files are open */}
+          {/* Left: Editor panel — visible when one or more files are open */}
           {openTabs.length > 0 && (
-            <div className="editor-section">
-              {/* File tab bar */}
-              <div className="editor-tabs">
-                {openTabs.map(tab => (
-                  <div
-                    key={tab.id}
-                    className={`editor-tab ${tab.id === activeTabId ? 'active' : ''}`}
-                    onClick={() => setActiveTabId(tab.id)}
-                  >
-                    <span className="editor-tab-name">
-                      {tab.name}{tab.isDirty ? ' ●' : ''}
-                    </span>
-                    <button
-                      className="editor-tab-close"
-                      onClick={(e) => handleCloseTab(tab.id, e)}
+            <>
+              <div
+                className="editor-section"
+                style={{ width: `${terminalWidth}%` }}
+              >
+                <div className="editor-tabs">
+                  {openTabs.map(tab => (
+                    <div
+                      key={tab.id}
+                      className={`editor-tab ${tab.id === activeTabId ? 'active' : ''}`}
+                      onClick={() => setActiveTabId(tab.id)}
                     >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                      <span className="editor-tab-name">
+                        {tab.name}{tab.isDirty ? ' ●' : ''}
+                      </span>
+                      <button
+                        className="editor-tab-close"
+                        onClick={(e) => handleCloseTab(tab.id, e)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {activeTab && (
+                  <CodeEditor
+                    filePath={activeTab.path}
+                    content={activeTab.content}
+                    onContentChange={(content) => handleTabContentChange(activeTabId!, content)}
+                    onSave={() => handleTabSaved(activeTabId!)}
+                    tabSize={tabSize}
+                  />
+                )}
               </div>
 
-              {/* Active file editor */}
-              {activeTab && (
-                <CodeEditor
-                  filePath={activeTab.path}
-                  content={activeTab.content}
-                  onContentChange={(content) => handleTabContentChange(activeTabId!, content)}
-                  onSave={() => handleTabSaved(activeTabId!)}
-                  tabSize={tabSize}
-                />
-              )}
-            </div>
+              {/* Drag handle between editor and terminal */}
+              <div
+                className={`editor-resize-handle${isResizing ? ' resizing' : ''}`}
+                onMouseDown={handleResizeStart}
+              />
+            </>
           )}
 
-          <div className="terminal-topbar">
-            {/* Terminal tabs */}
-            <div className="terminal-tabs">
-              {terminalTabs.map(tab => (
-                <div
-                  key={tab.id}
-                  className={`terminal-tab ${tab.id === activeTerminalId ? "active" : ""}`}
-                  onClick={() => setActiveTerminalId(tab.id)}
-                >
-                  <span className="terminal-tab-title">{tab.title}</span>
-                  {terminalTabs.length > 1 && (
-                    <button
-                      className="terminal-tab-close"
-                      onClick={(e) => closeTerminalTab(tab.id, e)}
-                    >
-                      x
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button className="terminal-tab-add" onClick={addTerminalTab} title="New Terminal (Cmd+D)">
-                +
-              </button>
+          {/* Right: Terminal area */}
+          <div className="terminal-area">
+            <div className="terminal-topbar">
+              <div className="terminal-tabs">
+                {terminalTabs.map(tab => (
+                  <div
+                    key={tab.id}
+                    className={`terminal-tab ${tab.id === activeTerminalId ? "active" : ""}`}
+                    onClick={() => setActiveTerminalId(tab.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="terminal-tab-icon">
+                      <polyline points="4 17 10 11 4 5"/>
+                      <line x1="12" y1="19" x2="20" y2="19"/>
+                    </svg>
+                    <span className="terminal-tab-title">{tab.title}</span>
+                    {terminalTabs.length > 1 && (
+                      <button
+                        className="terminal-tab-close"
+                        onClick={(e) => closeTerminalTab(tab.id, e)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button className="terminal-tab-add" onClick={addTerminalTab} title="New Terminal (Cmd+D)">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
-
-          </div>
-
-          <div className={`terminal-body ${terminalTabs.length > 1 ? 'split-view' : ''}`}>
-            {terminalTabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`terminal-tab-content ${tab.id === activeTerminalId ? 'active' : ''}`}
-                style={{ display: terminalTabs.length > 1 || tab.id === activeTerminalId ? "flex" : "none" }}
-                onClick={() => setActiveTerminalId(tab.id)}
-              >
-                {terminalTabs.length > 1 && (
-                  <div className="split-terminal-header">
-                    <span>{tab.title}</span>
-                    <button
-                      className="split-terminal-close"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeTerminalTab(tab.id, e);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-                <TerminalBlock
-                  ref={(el) => {
-                    if (el) {
-                      terminalRefs.current.set(tab.id, el);
-                      // If this terminal was created for automation, run the queued command
-                      const pendingCmd = pendingAutomationCommands.current.get(tab.id);
-                      if (pendingCmd) {
-                        pendingAutomationCommands.current.delete(tab.id);
-                        // Small delay so the PTY session has time to start
-                        setTimeout(() => el.write(pendingCmd), 800);
+            <div className={`terminal-body ${terminalTabs.length > 1 ? 'split-view' : ''}`}>
+              {terminalTabs.flatMap((tab, index) => {
+                const isVisible = terminalTabs.length > 1 || tab.id === activeTerminalId;
+                const widthStyle = terminalTabs.length > 1 && splitWidths.length === terminalTabs.length
+                  ? { flexBasis: `${splitWidths[index]}%`, flexGrow: 0, flexShrink: 0 }
+                  : {};
+                const tabEl = (
+                <div
+                  key={tab.id}
+                  className={`terminal-tab-content ${tab.id === activeTerminalId ? 'active' : ''}`}
+                  style={{ display: isVisible ? "flex" : "none", ...widthStyle }}
+                  onClick={() => setActiveTerminalId(tab.id)}
+                >
+                  {terminalTabs.length > 1 && (
+                    <div className="split-terminal-header">
+                      <span>{tab.title}</span>
+                      <button
+                        className="split-terminal-close"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeTerminalTab(tab.id, e);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                  <TerminalBlock
+                    ref={(el) => {
+                      if (el) {
+                        terminalRefs.current.set(tab.id, el);
+                        const pendingCmd = pendingAutomationCommands.current.get(tab.id);
+                        if (pendingCmd) {
+                          pendingAutomationCommands.current.delete(tab.id);
+                          setTimeout(() => el.write(pendingCmd), 800);
+                        }
+                      } else {
+                        terminalRefs.current.delete(tab.id);
                       }
-                    } else {
-                      terminalRefs.current.delete(tab.id);
-                    }
-                  }}
-                  cwd={shellCwd}
-                  onCwdChange={setShellCwd}
-                  theme={theme}
-                  onAIRequest={handleAIRequest}
-                  aiEnabled={!!aiConfig?.apiKey}
-                  recentFiles={openTabs.map(tab => tab.path)}
-                  gitChanges={gitChanges}
-                  currentFile={activeTab ? {
-                    path: activeTab.path,
-                    content: activeTab.content,
-                    language: activeTab.path.split('.').pop() || 'text'
-                  } : undefined}
-                  onFileUpdate={(path, content) => {
-                    const tab = openTabs.find(t => t.path === path);
-                    if (tab) {
-                      handleTabContentChange(tab.id, content);
-                    }
-                  }}
-                  onOpenGitPanel={() => {
-                    setShowGitPanel(true);
-                    setShowVoiceChat(false);
-                    setShowSearchPanel(false);
-                    setShowToolPanel(false);
-                    setShowAutomation(false);
-                    setShowSwarm(false);
-                  }}
-                  projectDir={currentDir}
-                  projectFileList={allFiles}
-                  projectFileContents={projectFileContents}
-                  workspaceContext={workspaceContext}
-                />
-              </div>
-            ))}
+                    }}
+                    cwd={shellCwd}
+                    onCwdChange={setShellCwd}
+                    theme={theme}
+                    onAIRequest={handleAIRequest}
+                    aiEnabled={!!aiConfig?.apiKey}
+                    recentFiles={openTabs.map(tab => tab.path)}
+                    gitChanges={gitChanges}
+                    currentFile={activeTab ? {
+                      path: activeTab.path,
+                      content: activeTab.content,
+                      language: activeTab.path.split('.').pop() || 'text'
+                    } : undefined}
+                    onFileUpdate={(path, content) => {
+                      const tab = openTabs.find(t => t.path === path);
+                      if (tab) {
+                        handleTabContentChange(tab.id, content);
+                      }
+                    }}
+                    onOpenGitPanel={() => {
+                      setShowGitPanel(true);
+                      setShowVoiceChat(false);
+                      setShowSearchPanel(false);
+                      setShowToolPanel(false);
+                      setShowAutomation(false);
+                      setShowSwarm(false);
+                    }}
+                    projectDir={currentDir}
+                    projectFileList={allFiles}
+                    projectFileContents={projectFileContents}
+                    workspaceContext={workspaceContext}
+                  />
+                </div>
+                );
+                const elements = [tabEl];
+                if (terminalTabs.length > 1 && index < terminalTabs.length - 1) {
+                  elements.push(
+                    <div
+                      key={`split-handle-${index}`}
+                      className="split-resize-handle"
+                      onMouseDown={(e) => handleSplitResizeStart(e, index)}
+                    />
+                  );
+                }
+                return elements;
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Right panel: tools, search, git, automation, or swarm */}
+        {/* Right panel: tools, search, git, voice, automation, or swarm */}
         <div className={`right-panel${hasRightPanel ? ' open' : ''}`}>
           {showToolPanel && (
             <ToolPanel
@@ -1263,6 +1421,9 @@ Working directory: ${currentDir || 'unknown'}`;
               theme={theme}
               hasApiKey={!!aiConfig?.apiKey}
               configuredProviders={configuredProviders}
+              terminalTabs={terminalTabs}
+              terminalRefs={terminalRefs}
+              onAddTerminal={addTerminalTab}
               onGeneratePrompts={(goal, count) => aiService.generateAutomationPrompts(goal, count)}
               onStartAutomation={handleStartAutomation}
             />
@@ -1276,8 +1437,52 @@ Working directory: ${currentDir || 'unknown'}`;
               hasApiKey={!!aiConfig?.apiKey}
             />
           )}
+          {canShowVoiceChat && (
+            <VoiceChat
+              apiKey={openaiApiKey}
+              onClose={() => setShowVoiceChat(false)}
+            />
+          )}
         </div>
       </main>
+
+      {/* Status bar */}
+      <div className="status-bar">
+        <div className="status-left">
+          {currentDir ? (
+            <>
+              <span className="status-item status-branch">
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15"/>
+                  <circle cx="18" cy="6" r="3"/>
+                  <circle cx="6" cy="18" r="3"/>
+                  <path d="M18 9a9 9 0 0 1-9 9"/>
+                </svg>
+                <span>main</span>
+              </span>
+              <span className="status-sep"/>
+              <span className="status-item">{currentDir.split("/").pop()}</span>
+            </>
+          ) : (
+            <span className="status-item status-muted">No project open</span>
+          )}
+        </div>
+        <div className="status-right">
+          {activeTab && (
+            <span className="status-item status-lang">
+              {activeTab.path.split('.').pop()?.toUpperCase() || 'TEXT'}
+            </span>
+          )}
+          <button
+            className="status-item status-theme-btn"
+            onClick={() => handleThemeChange(theme === 'dark' ? 'light' : 'dark')}
+            title="Toggle Theme"
+          >
+            {theme === 'dark' ? '☀' : '◗'}
+          </button>
+          <span className="status-item status-brand">Velix</span>
+        </div>
+      </div>
 
       <Settings
         isOpen={showSettings}
@@ -1296,9 +1501,6 @@ Working directory: ${currentDir || 'unknown'}`;
         files={allFiles}
         onFileSelect={handleQuickFinderSelect}
       />
-
-
-
     </div>
   );
 }

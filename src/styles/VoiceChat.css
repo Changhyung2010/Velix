@@ -2,38 +2,25 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--bg-secondary, #0f1419);
-}
-
-.app.light .voice-chat {
-  background-color: #ffffff;
+  background-color: var(--bg-secondary);
 }
 
 .voice-chat-header {
   height: 44px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--border-light, #1a2332);
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--bg-sidebar, #0a0e14);
-}
-
-.app.light .voice-chat-header {
-  border-bottom-color: #e2e8f0;
-  background: #f1f5f9;
+  background: var(--bg-sidebar);
 }
 
 .voice-chat-header h3 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-primary, #e6edf3);
-}
-
-.app.light .voice-chat-header h3 {
-  color: #0f172a;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 .voice-chat-controls {
@@ -45,20 +32,14 @@
 .voice-select {
   padding: 6px 12px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  border: 1px solid var(--border-default, #232d3b);
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
-  background: var(--bg-input, #0d1117);
-  color: var(--text-primary, #e6edf3);
+  background: var(--bg-input);
+  color: var(--text-primary);
   cursor: pointer;
   outline: none;
   transition: all 0.2s ease;
-}
-
-.app.light .voice-select {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #0f172a;
 }
 
 .voice-select:focus {
@@ -74,11 +55,11 @@
 .clear-btn {
   padding: 6px 14px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
   background: transparent;
-  color: var(--text-secondary, #9198a1);
-  border: 1px solid var(--border-default, #232d3b);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -103,7 +84,7 @@
 .voice-chat .close-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   font-size: 18px;
   cursor: pointer;
   padding: 6px 10px;
@@ -114,7 +95,7 @@
 .voice-chat .close-btn:hover {
   background: rgba(255, 107, 107, 0.1);
   border-color: rgba(255, 107, 107, 0.3);
-  color: #ff6b6b;
+  color: var(--accent-red);
 }
 
 .voice-chat-messages {
@@ -131,9 +112,9 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
   font-size: 14px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   text-align: center;
 }
 
@@ -170,8 +151,8 @@
   align-items: center;
   gap: 10px;
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-muted, #6e7681);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
 }
 
 .message-role {
@@ -208,59 +189,33 @@
   box-shadow: 0 2px 10px var(--glow-primary);
 }
 
-.app.light .message.user .message-content {
-  background: linear-gradient(135deg, #345830 0%, #4a7a44 100%);
-  box-shadow: 0 2px 10px rgba(52, 88, 48, 0.2);
-}
-
-.app.dark .message.user .message-content {
-  background: linear-gradient(135deg, #4a7a44 0%, #5a9e54 100%);
-  box-shadow: 0 2px 10px rgba(90, 158, 84, 0.25);
-}
-
 .message.assistant .message-content {
-  background: var(--bg-code, #0a0e14);
-  color: var(--text-primary, #e6edf3);
-  border: 1px solid var(--border-default, #232d3b);
+  background: var(--bg-code);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-bottom-left-radius: 6px;
 }
 
-.app.light .message.assistant .message-content {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-  color: #0f172a;
-}
-
+/* Semantic red for errors */
 .voice-chat-error {
   padding: 14px 18px;
   background: rgba(255, 107, 107, 0.1);
-  border-top: 2px solid #ff6b6b;
-  color: #ff6b6b;
+  border-top: 2px solid var(--accent-red);
+  color: var(--accent-red);
   font-size: 13px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.app.light .voice-chat-error {
-  background: rgba(220, 38, 38, 0.08);
-  border-top-color: #dc2626;
-  color: #dc2626;
-}
-
 .voice-chat-footer {
   padding: 18px;
-  border-top: 1px solid var(--border-light, #1a2332);
+  border-top: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: var(--bg-sidebar, #0a0e14);
-}
-
-.app.light .voice-chat-footer {
-  border-top-color: #e2e8f0;
-  background: #f1f5f9;
+  background: var(--bg-sidebar);
 }
 
 .status-indicator {
@@ -273,14 +228,15 @@
 .status {
   font-size: 13px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* Semantic red for recording state */
 .status.recording {
-  color: #ff6b6b;
+  color: var(--accent-red);
   animation: pulse 1.5s infinite;
 }
 
@@ -302,15 +258,16 @@
 }
 
 .status.idle {
-  color: var(--text-muted, #6e7681);
+  color: var(--text-muted);
 }
 
+/* Semantic red for stop speaking button */
 .stop-speaking-btn {
   padding: 6px 16px;
   font-size: 11px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ff7eb6 100%);
+  background: var(--accent-red);
   color: white;
   border: none;
   border-radius: 6px;
@@ -322,7 +279,7 @@
 
 .stop-speaking-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  filter: brightness(1.1);
 }
 
 .mic-button {
@@ -342,16 +299,6 @@
   user-select: none;
 }
 
-.app.light .mic-button {
-  background: linear-gradient(135deg, #345830 0%, #4a7a44 100%);
-  box-shadow: 0 4px 16px rgba(52, 88, 48, 0.25);
-}
-
-.app.dark .mic-button {
-  background: linear-gradient(135deg, #4a7a44 0%, #5a9e54 100%);
-  box-shadow: 0 4px 16px rgba(90, 158, 84, 0.3);
-}
-
 .mic-button:hover:not(:disabled) {
   transform: translateY(-3px);
   box-shadow: 0 8px 24px var(--glow-primary);
@@ -361,10 +308,7 @@
   transform: translateY(-1px) scale(0.98);
 }
 
-.mic-button:active:not(:disabled) {
-  transform: translateY(-1px);
-}
-
+/* Semantic red for recording state */
 .mic-button.recording {
   background: linear-gradient(135deg, #ff6b6b 0%, #ff7eb6 100%);
   box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
@@ -394,7 +338,7 @@
 .mic-label {
   font-size: 14px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   letter-spacing: 0.5px;
 }
 
@@ -408,10 +352,10 @@
 }
 
 .voice-chat-messages::-webkit-scrollbar-thumb {
-  background: var(--border-default, #232d3b);
+  background: var(--border-default);
   border-radius: 3px;
 }
 
 .voice-chat-messages::-webkit-scrollbar-thumb:hover {
-  background: var(--text-hint, #484f58);
+  background: var(--text-hint);
 }

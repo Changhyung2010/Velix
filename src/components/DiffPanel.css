@@ -6,18 +6,10 @@
   flex-direction: column;
   border-radius: 16px;
   overflow: hidden;
-  font-family: "SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
-}
-
-.review-panel.dark {
-  background: #131417;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.light {
-  background: #f4f4f4;
-  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .review-panel-header {
@@ -26,16 +18,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-}
-
-.review-panel.dark .review-panel-header {
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.review-panel.light .review-panel-header {
-  background: rgba(255, 255, 255, 0.86);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .review-title-wrap {
@@ -49,20 +33,13 @@
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.01em;
-}
-
-.review-panel.dark .review-title {
-  color: #f0f0f0;
-}
-
-.review-panel.light .review-title {
-  color: #171717;
+  color: var(--text-primary);
 }
 
 .review-summary {
   font-size: 13px;
   font-weight: 700;
-  color: #16a34a;
+  color: var(--accent-primary);
 }
 
 .review-header-actions {
@@ -77,32 +54,17 @@
   padding: 5px 11px;
   font-size: 12px;
   font-weight: 600;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .review-chip.active {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 .review-chip.muted {
   opacity: 0.55;
-}
-
-.review-panel.dark .review-chip {
-  color: #f3f3f3;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.dark .review-chip.active {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.review-panel.light .review-chip {
-  color: #212121;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.review-panel.light .review-chip.active {
-  background: rgba(0, 0, 0, 0.11);
 }
 
 .review-close {
@@ -113,16 +75,17 @@
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
 }
 
-.review-panel.dark .review-close {
-  color: #d4d4d4;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.light .review-close {
-  color: #303030;
-  background: rgba(0, 0, 0, 0.08);
+.review-close:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 .review-content {
@@ -139,14 +102,7 @@
   min-height: 0;
   padding: 14px;
   gap: 10px;
-}
-
-.review-panel.dark .review-main {
-  background: #111315;
-}
-
-.review-panel.light .review-main {
-  background: #efefef;
+  background: var(--bg-primary);
 }
 
 .review-banner {
@@ -154,16 +110,8 @@
   font-weight: 600;
   padding: 10px 12px;
   border-radius: 10px;
-}
-
-.review-panel.dark .review-banner {
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.review-panel.light .review-banner {
-  color: rgba(0, 0, 0, 0.62);
-  background: rgba(0, 0, 0, 0.07);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .review-file-head {
@@ -173,14 +121,7 @@
   gap: 10px;
   border-radius: 12px;
   padding: 10px 12px;
-}
-
-.review-panel.dark .review-file-head {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.light .review-file-head {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--bg-hover);
 }
 
 .review-file-name {
@@ -189,6 +130,7 @@
   gap: 10px;
   min-width: 0;
   overflow: hidden;
+  color: var(--text-primary);
 }
 
 .review-file-name > span:first-child {
@@ -206,6 +148,7 @@
   font-weight: 700;
 }
 
+/* Keep semantic green/red for diff stats */
 .review-file-stats .add {
   color: #16a34a;
 }
@@ -221,16 +164,13 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  background: var(--bg-active);
+  color: var(--text-primary);
+  transition: background 0.15s;
 }
 
-.review-panel.dark .review-revert-file {
-  background: rgba(255, 255, 255, 0.12);
-  color: #f3f3f3;
-}
-
-.review-panel.light .review-revert-file {
-  background: rgba(255, 255, 255, 0.9);
-  color: #2a2a2a;
+.review-revert-file:hover {
+  background: var(--bg-hover);
 }
 
 .review-diff-body {
@@ -238,19 +178,11 @@
   min-height: 0;
   overflow: auto;
   border-radius: 12px;
-  font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.52;
-}
-
-.review-panel.dark .review-diff-body {
-  background: #15171a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.light .review-diff-body {
-  background: #f7f7f7;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--bg-code);
+  border: 1px solid var(--border-light);
 }
 
 .review-hunk {
@@ -260,16 +192,8 @@
 .review-hunk-header {
   font-size: 11px;
   padding: 4px 10px;
-}
-
-.review-panel.dark .review-hunk-header {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.review-panel.light .review-hunk-header {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.48);
+  background: var(--bg-hover);
+  color: var(--text-hint);
 }
 
 .review-gap {
@@ -278,34 +202,23 @@
   padding: 5px 9px;
   font-size: 11px;
   font-weight: 600;
-}
-
-.review-panel.dark .review-gap {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.58);
-}
-
-.review-panel.light .review-gap {
-  background: rgba(0, 0, 0, 0.07);
-  color: rgba(0, 0, 0, 0.54);
+  background: var(--bg-hover);
+  color: var(--text-muted);
 }
 
 .review-diff-line {
   display: grid;
   grid-template-columns: 52px 52px minmax(0, 1fr);
   align-items: flex-start;
+  color: var(--text-secondary);
 }
 
 .review-line-num {
   padding: 0 8px;
   text-align: right;
   user-select: none;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid var(--border-light);
   opacity: 0.6;
-}
-
-.review-panel.dark .review-line-num {
-  border-right-color: rgba(255, 255, 255, 0.08);
 }
 
 .review-line-text {
@@ -318,30 +231,25 @@
   opacity: 0.86;
 }
 
+/* Semantic green/red for added/removed diff lines */
 .review-diff-line.added {
-  background: rgba(22, 163, 74, 0.13);
-  border-left: 3px solid rgba(22, 163, 74, 0.95);
+  background: rgba(22, 163, 74, 0.1);
+  border-left: 3px solid rgba(22, 163, 74, 0.8);
+  color: #16a34a;
 }
 
 .review-diff-line.removed {
-  background: rgba(220, 38, 38, 0.13);
-  border-left: 3px solid rgba(220, 38, 38, 0.95);
+  background: rgba(220, 38, 38, 0.1);
+  border-left: 3px solid rgba(220, 38, 38, 0.8);
+  color: #dc2626;
 }
 
-.review-panel.dark .review-diff-line.added {
-  color: #b7f7c9;
+.app.dark .review-diff-line.added {
+  color: #86efac;
 }
 
-.review-panel.dark .review-diff-line.removed {
-  color: #ffbaba;
-}
-
-.review-panel.light .review-diff-line.added {
-  color: #0f6a2f;
-}
-
-.review-panel.light .review-diff-line.removed {
-  color: #a01818;
+.app.dark .review-diff-line.removed {
+  color: #fca5a5;
 }
 
 .review-footer-actions {
@@ -359,41 +267,41 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.15s;
 }
 
 .review-footer-btn.revert {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-color: var(--border-default);
 }
 
+.review-footer-btn.revert:hover {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* Keep semantic green for keep/accept */
 .review-footer-btn.keep {
-  background: rgba(22, 163, 74, 0.16);
-  color: #166534;
+  background: rgba(22, 163, 74, 0.15);
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.4);
 }
 
-.review-panel.dark .review-footer-btn.revert {
-  color: #f5f5f5;
-  background: rgba(255, 255, 255, 0.12);
+.review-footer-btn.keep:hover {
+  background: rgba(22, 163, 74, 0.25);
 }
 
-.review-panel.dark .review-footer-btn.keep {
-  color: #ddfbe6;
-  background: rgba(22, 163, 74, 0.28);
+.app.dark .review-footer-btn.keep {
+  color: #86efac;
 }
 
 .review-sidebar {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(0, 0, 0, 0.07);
-}
-
-.review-panel.dark .review-sidebar {
-  background: #17191d;
-  border-left-color: rgba(255, 255, 255, 0.08);
-}
-
-.review-panel.light .review-sidebar {
-  background: #f2f2f2;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border-light);
 }
 
 .review-filter-wrap {
@@ -403,21 +311,18 @@
 .review-filter {
   width: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border-default);
   padding: 10px 12px;
   font-size: 15px;
   outline: none;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color 0.15s;
 }
 
-.review-panel.dark .review-filter {
-  background: #202228;
-  color: #ededed;
-  border-color: rgba(255, 255, 255, 0.14);
-}
-
-.review-panel.light .review-filter {
-  background: rgba(255, 255, 255, 0.86);
-  color: #1f1f1f;
+.review-filter:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--glow-primary);
 }
 
 .review-tree {
@@ -435,6 +340,7 @@
   font-size: 13px;
   font-weight: 600;
   opacity: 0.84;
+  color: var(--text-secondary);
 }
 
 .review-tree-folder .icon,
@@ -456,34 +362,18 @@
   text-align: left;
   cursor: pointer;
   font-size: 14px;
-}
-
-.review-panel.dark .review-tree-file {
-  color: #dddddd;
-}
-
-.review-panel.light .review-tree-file {
-  color: #444444;
+  color: var(--text-secondary);
+  transition: background 0.12s;
 }
 
 .review-tree-file:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.review-panel.dark .review-tree-file:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
 }
 
 .review-tree-file.active {
   font-weight: 700;
-}
-
-.review-panel.light .review-tree-file.active {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.review-panel.dark .review-tree-file.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 .review-tree-file .label {
@@ -507,7 +397,7 @@
   height: 100%;
   min-height: 120px;
   font-size: 13px;
-  opacity: 0.62;
+  color: var(--text-hint);
 }
 
 @media (max-width: 1080px) {
@@ -528,6 +418,6 @@
   .review-sidebar {
     max-height: 220px;
     border-left: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--border-light);
   }
 }
