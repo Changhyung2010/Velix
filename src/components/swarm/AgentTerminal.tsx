@@ -25,6 +25,24 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const terminalRef = useRef<HTMLDivElement>(null);
+  const displayName = agent.label || agent.role.name;
+  const outputLines = agent.outputBuffer
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const taskSummary = (() => {
+    const lines = agent.assignedTask
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const assignedLine = lines.find((line) => line.startsWith('Your assigned task:'));
+    if (assignedLine) {
+      return assignedLine.replace(/^Your assigned task:\s*/, '');
+    }
+    return lines[0] || agent.assignedTask;
+  })();
+  const ownershipSummary = agent.ownedFiles && agent.ownedFiles.length > 0
+    ? `Owns ${agent.ownedFiles.slice(0, 3).join(', ')}${agent.ownedFiles.length > 3 ? '…' : ''}`
+    : null;
 
   // Auto-scroll to bottom when output changes
   useEffect(() => {
@@ -81,7 +99,7 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
       <div className="terminal-header">
         <div className="terminal-title">
           <div className="status-dot" style={{ backgroundColor: getStatusColor() }} />
-          <span className="agent-name">{agent.role.name}</span>
+          <span className="agent-name">{displayName}</span>
           <span className="status-label" style={{ color: getStatusColor() }}>
             {getStatusText()}
           </span>
@@ -104,23 +122,33 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
         </div>
       </div>
 
-      <div className="agent-task-label" title={agent.assignedTask}>
-        {agent.assignedTask}
+      <div className="agent-work-block">
+        <span className="agent-work-title">Working on</span>
+        <div className="agent-work-copy" title={agent.assignedTask}>
+          {taskSummary}
+        </div>
       </div>
+      {ownershipSummary && (
+        <div className="agent-ownership-label" title={agent.ownedFiles?.join(', ')}>
+          {ownershipSummary}
+        </div>
+      )}
 
-      <div className="terminal-window" ref={terminalRef}>
-        {agent.outputBuffer.length === 0 ? (
-          <div className="terminal-line muted">Launching claude agent...</div>
-        ) : (
-          agent.outputBuffer.map((line, i) => (
-            <div key={i} className="terminal-line">
-              {line}
-            </div>
-          ))
-        )}
-      </div>
+      {expanded && (
+        <div className="terminal-window" ref={terminalRef}>
+          {outputLines.length === 0 ? (
+            <div className="terminal-line muted">Launching Claude Code for {displayName}...</div>
+          ) : (
+            agent.outputBuffer.map((line, i) => (
+              <div key={i} className="terminal-line">
+                {line}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
-      {!isFinished && (
+      {!isFinished && expanded && (
         <div className="terminal-input-row">
           <input
             type="text"

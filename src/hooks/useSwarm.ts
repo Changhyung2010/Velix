@@ -77,7 +77,7 @@ export function useSwarm(options: UseSwarmOptions): UseSwarmReturn {
     try {
       await orchestratorRef.current.initialize({
         workspacePath,
-        maxAgents: 5,
+        maxAgents: 8,
         maxRuntime: 600000,
         maxRetries: 3,
         dryRunMode: false,
@@ -147,7 +147,7 @@ export function useSwarm(options: UseSwarmOptions): UseSwarmReturn {
       const analysis = await aiService.analyzeTaskComplexity(goal.trim());
       const result: ComplexityAnalysis = {
         score: analysis.complexity,
-        agentCount: Math.min(analysis.agentCount, 5),
+        agentCount: Math.min(analysis.agentCount, 8),
         reasoning: analysis.reasoning,
         factors: [],
         estimatedDuration: analysis.agentCount * 10,

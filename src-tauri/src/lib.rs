@@ -5,9 +5,99 @@ use std::fs;
 use std::io::{Read, Write as IoWrite};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Cached list of directories to search for CLI binaries.
+/// Built once by spawning login shells; subsequent calls read from here.
+static SEARCH_DIRS_CACHE: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Per-binary result cache: command name → absolute path.
+static CLI_PATH_CACHE: OnceLock<Mutex<HashMap<String, Result<String, ()>>>> = OnceLock::new();
+
+fn cli_path_cache() -> &'static Mutex<HashMap<String, Result<String, ()>>> {
+    CLI_PATH_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Build (and cache) the ordered list of directories to scan for binaries.
+fn get_search_dirs() -> Vec<String> {
+    SEARCH_DIRS_CACHE
+        .get_or_init(|| {
+            let home = dirs_or_home();
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+
+            let login_path = Command::new(&shell)
+                .args(["-l", "-c", "echo $PATH"])
+                .env("HOME", &home)
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+
+            let interactive_path = Command::new(&shell)
+                .args(["-i", "-l", "-c", "echo $PATH"])
+                .env("HOME", &home)
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+
+            let mut dirs: Vec<String> = Vec::new();
+            for raw in [login_path, interactive_path].into_iter().flatten() {
+                for dir in raw.split(':') {
+                    let d = dir.trim().to_string();
+                    if !d.is_empty() && !dirs.contains(&d) {
+                        dirs.push(d);
+                    }
+                }
+            }
+
+            let extra_dirs = vec![
+                "/opt/homebrew/bin".to_string(),
+                "/usr/local/bin".to_string(),
+                "/usr/bin".to_string(),
+                format!("{}/.npm-global/bin", home),
+                format!("{}/.yarn/bin", home),
+                format!("{}/.cargo/bin", home),
+                format!("{}/.bun/bin", home),
+            ];
+            for d in extra_dirs {
+                if !dirs.contains(&d) {
+                    dirs.push(d);
+                }
+            }
+
+            let nvm_versions_dir = format!("{}/.nvm/versions/node", home);
+            if let Ok(entries) = std::fs::read_dir(&nvm_versions_dir) {
+                let mut versions: Vec<String> = entries
+                    .flatten()
+                    .filter(|e| e.path().is_dir())
+                    .map(|e| e.file_name().to_string_lossy().to_string())
+                    .collect();
+                versions.sort_by(|a, b| {
+                    let parse = |s: &str| -> Vec<u64> {
+                        s.trim_start_matches('v')
+                            .split('.')
+                            .filter_map(|p| p.parse().ok())
+                            .collect()
+                    };
+                    parse(b).cmp(&parse(a))
+                });
+                for version in &versions {
+                    let bin = format!("{}/{}/bin", nvm_versions_dir, version);
+                    if !dirs.contains(&bin) {
+                        dirs.push(bin);
+                    }
+                }
+            }
+
+            dirs
+        })
+        .clone()
+}
 
 const SETTINGS_FILENAME: &str = "settings.json";
 
@@ -418,13 +508,27 @@ fn execute_shell_command(
         });
     }
 
-    // Execute via /bin/zsh (macOS default shell)
-    let output = Command::new("/bin/zsh")
+    // Resolve the full PATH from the user's login shell so tools installed via
+    // nvm, homebrew, etc. are visible — matches how pty_create sets up workers.
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let full_path = Command::new(&shell)
+        .args(["-l", "-c", "echo $PATH"])
+        .env("HOME", dirs_or_home())
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
+
+    // Execute via the user's shell
+    let output = Command::new(&shell)
         .args(&["-c", command])
         .current_dir(&working_dir)
         .env("HOME", dirs_or_home())
         .env("TERM", "xterm-256color")
         .env("LANG", "en_US.UTF-8")
+        .env("PATH", &full_path)
         .output()
         .map_err(|e| format!("Failed to execute command: {}", e))?;
 
@@ -438,6 +542,53 @@ fn execute_shell_command(
         exit_code,
         cwd: working_dir,
     })
+}
+
+/// Locate a CLI binary using the user's full login-shell PATH, then fall back
+/// to well-known installation directories (nvm, homebrew, npm-global, cargo).
+/// Results are cached so repeated calls (e.g. reopening the Swarm panel) are instant.
+#[tauri::command]
+fn check_cli_available(command: String) -> Result<String, String> {
+    // Fast path: return cached result if available.
+    if let Ok(cache) = cli_path_cache().lock() {
+        if let Some(cached) = cache.get(&command) {
+            return cached
+                .clone()
+                .map_err(|_| format!("{} not found in login-shell PATH or common install locations", command));
+        }
+    }
+
+    // Slow path (first call only): get ordered search dirs, then scan.
+    let dirs = get_search_dirs();
+    let mut found: Option<String> = None;
+
+    'outer: for dir in &dirs {
+        let candidate = Path::new(dir).join(&command);
+        if candidate.is_file() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = std::fs::metadata(&candidate) {
+                    if meta.permissions().mode() & 0o111 != 0 {
+                        found = Some(candidate.to_string_lossy().to_string());
+                        break 'outer;
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                found = Some(candidate.to_string_lossy().to_string());
+                break 'outer;
+            }
+        }
+    }
+
+    // Store result in cache (both hits and misses).
+    if let Ok(mut cache) = cli_path_cache().lock() {
+        cache.insert(command.clone(), found.clone().ok_or(()));
+    }
+
+    found.ok_or_else(|| format!("{} not found in login-shell PATH or common install locations", command))
 }
 
 #[tauri::command]
@@ -1149,6 +1300,257 @@ fn get_git_diff(repo_path: &str, file_path: &str, staged: bool) -> Result<String
     }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitBranchList {
+    current: String,
+    local: Vec<String>,
+    remote: Vec<String>,
+}
+
+#[tauri::command]
+fn git_list_branches(repo_path: &str) -> Result<GitBranchList, String> {
+    let path = Path::new(repo_path);
+
+    // Get current branch
+    let current_output = Command::new("git")
+        .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let current = if current_output.status.success() {
+        String::from_utf8_lossy(&current_output.stdout)
+            .trim()
+            .to_string()
+    } else {
+        "HEAD".to_string()
+    };
+
+    // Get all branches
+    let branch_output = Command::new("git")
+        .args(&["branch", "-a", "--no-color"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let mut local = Vec::new();
+    let mut remote = Vec::new();
+
+    if branch_output.status.success() {
+        let stdout = String::from_utf8_lossy(&branch_output.stdout);
+        for line in stdout.lines() {
+            let name = line.trim().trim_start_matches("* ").to_string();
+            if name.is_empty() || name.contains("HEAD ->") {
+                continue;
+            }
+            if name.starts_with("remotes/") {
+                // Strip "remotes/origin/" prefix for display
+                let short = name
+                    .strip_prefix("remotes/origin/")
+                    .unwrap_or(&name)
+                    .to_string();
+                if !short.is_empty() && !remote.contains(&short) {
+                    remote.push(short);
+                }
+            } else {
+                local.push(name);
+            }
+        }
+    }
+
+    Ok(GitBranchList {
+        current,
+        local,
+        remote,
+    })
+}
+
+#[tauri::command]
+fn git_checkout_branch(repo_path: &str, branch: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    let output = Command::new("git")
+        .args(&["checkout", branch])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Ok(if msg.is_empty() {
+            format!("Switched to branch '{}'", branch)
+        } else {
+            msg
+        })
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_create_branch(repo_path: &str, branch: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    let output = Command::new("git")
+        .args(&["checkout", "-b", branch])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(format!("Created and switched to branch '{}'", branch))
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_pull(repo_path: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    let output = Command::new("git")
+        .args(&["pull"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_push(repo_path: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    // First try regular push
+    let output = Command::new("git")
+        .args(&["push"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Ok(if msg.is_empty() {
+            "Push successful".to_string()
+        } else {
+            msg
+        })
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        // If no upstream, try setting upstream
+        if stderr.contains("no upstream") || stderr.contains("has no upstream") {
+            let branch_output = Command::new("git")
+                .args(&["rev-parse", "--abbrev-ref", "HEAD"])
+                .current_dir(path)
+                .output()
+                .map_err(|e| e.to_string())?;
+
+            let branch = String::from_utf8_lossy(&branch_output.stdout)
+                .trim()
+                .to_string();
+
+            let push_output = Command::new("git")
+                .args(&["push", "-u", "origin", &branch])
+                .current_dir(path)
+                .output()
+                .map_err(|e| e.to_string())?;
+
+            if push_output.status.success() {
+                Ok(format!("Pushed and set upstream to origin/{}", branch))
+            } else {
+                Err(String::from_utf8_lossy(&push_output.stderr)
+                    .trim()
+                    .to_string())
+            }
+        } else {
+            Err(stderr)
+        }
+    }
+}
+
+#[tauri::command]
+fn git_fetch(repo_path: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    let output = Command::new("git")
+        .args(&["fetch", "--all"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        let msg = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Ok(if msg.is_empty() {
+            "Fetch complete".to_string()
+        } else {
+            msg
+        })
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_init(repo_path: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    if !path.exists() || !path.is_dir() {
+        return Err(format!("Not a valid directory: {}", repo_path));
+    }
+
+    let output = Command::new("git")
+        .args(&["init"])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_add_remote(repo_path: &str, name: &str, url: &str) -> Result<String, String> {
+    let path = Path::new(repo_path);
+
+    let output = Command::new("git")
+        .args(&["remote", "add", name, url])
+        .current_dir(path)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(format!("Remote '{}' added: {}", name, url))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        // If remote already exists, try updating it instead
+        if stderr.contains("already exists") {
+            let update_output = Command::new("git")
+                .args(&["remote", "set-url", name, url])
+                .current_dir(path)
+                .output()
+                .map_err(|e| e.to_string())?;
+
+            if update_output.status.success() {
+                Ok(format!("Remote '{}' updated: {}", name, url))
+            } else {
+                Err(String::from_utf8_lossy(&update_output.stderr)
+                    .trim()
+                    .to_string())
+            }
+        } else {
+            Err(stderr)
+        }
+    }
+}
+
 #[tauri::command]
 async fn ask_claude(prompt: String, state: tauri::State<'_, AppState>) -> Result<String, String> {
     // Claude API integration - using current claude-sonnet-4-6 model
@@ -1175,13 +1577,22 @@ async fn ask_claude(prompt: String, state: tauri::State<'_, AppState>) -> Result
             .and_then(|v| v.as_object())
         {
             // Full project context
+            // Cap per-file content and total snapshot to keep prompt tokens low.
+            const FILE_CHAR_LIMIT: usize = 1500;
+            const SNAPSHOT_CHAR_LIMIT: usize = 12000;
             let mut project_snapshot = String::new();
             for (file_path, content_val) in project_files {
+                if project_snapshot.len() >= SNAPSHOT_CHAR_LIMIT { break; }
                 if let Some(content) = content_val.as_str() {
                     let ext = file_path.rsplit('.').next().unwrap_or("text");
+                    let truncated = if content.len() > FILE_CHAR_LIMIT {
+                        &content[..FILE_CHAR_LIMIT]
+                    } else {
+                        content
+                    };
                     project_snapshot.push_str(&format!(
                         "\n--- FILE: {} ---\n```{}\n{}\n```\n",
-                        file_path, ext, content
+                        file_path, ext, truncated
                     ));
                 }
             }
@@ -1200,8 +1611,8 @@ async fn ask_claude(prompt: String, state: tauri::State<'_, AppState>) -> Result
             );
 
             serde_json::json!({
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 8192,
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 2048,
                 "system": system_message,
                 "messages": [{"role": "user", "content": user_prompt}]
             })
@@ -1225,21 +1636,21 @@ async fn ask_claude(prompt: String, state: tauri::State<'_, AppState>) -> Result
             );
 
             serde_json::json!({
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 4096,
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1024,
                 "system": system_message,
                 "messages": [{"role": "user", "content": user_prompt}]
             })
         } else {
             serde_json::json!({
-                "model": "claude-sonnet-4-6",
+                "model": "claude-haiku-4-5-20251001",
                 "max_tokens": 1024,
                 "messages": [{"role": "user", "content": user_prompt}]
             })
         }
     } else {
         serde_json::json!({
-            "model": "claude-sonnet-4-6",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": 1024,
             "messages": [{"role": "user", "content": &prompt}]
         })
@@ -1566,6 +1977,7 @@ pub fn run() {
             save_api_key,
             get_api_key,
             execute_shell_command,
+            check_cli_available,
             get_shell_cwd,
             set_shell_cwd,
             get_git_history,
@@ -1576,6 +1988,14 @@ pub fn run() {
             search_in_files,
             get_git_status,
             get_git_diff,
+            git_list_branches,
+            git_checkout_branch,
+            git_create_branch,
+            git_pull,
+            git_push,
+            git_fetch,
+            git_init,
+            git_add_remote,
             pty_create,
             pty_write,
             pty_resize,

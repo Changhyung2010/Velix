@@ -51,9 +51,22 @@ export class RoleSystem {
       selectedRoles.push(AGENT_ROLES.implementer);
     }
 
+    if (criteria.taskType === 'new_feature' || criteria.taskType === 'mixed') {
+      selectedRoles.push(AGENT_ROLES.frontend, AGENT_ROLES.backend);
+    }
+
+    if (criteria.complexity >= 4) {
+      selectedRoles.push(AGENT_ROLES.builder);
+    }
+
+    if (criteria.complexity >= 5) {
+      selectedRoles.push(AGENT_ROLES.security);
+    }
+
     // Include tester if tests are involved
     if (criteria.hasTests || criteria.taskType === 'testing') {
       selectedRoles.push(AGENT_ROLES.tester);
+      selectedRoles.push(AGENT_ROLES.qa);
     }
 
     // Include refactorer for refactoring tasks
@@ -76,8 +89,12 @@ export class RoleSystem {
       selectedRoles.push(AGENT_ROLES.implementer);
     }
 
+    const deduped = selectedRoles.filter(
+      (role, index, arr) => arr.findIndex((candidate) => candidate.type === role.type) === index,
+    );
+
     // Sort by priority
-    return selectedRoles.sort((a, b) => b.priority - a.priority);
+    return deduped.sort((a, b) => b.priority - a.priority);
   }
 
   /**
@@ -123,6 +140,19 @@ export class RoleSystem {
       case 'implementer':
         confidence += 0.4; // Always high for implementer
         break;
+      case 'frontend':
+      case 'backend':
+        confidence += criteria.taskType === 'new_feature' || criteria.taskType === 'mixed' ? 0.35 : 0.1;
+        break;
+      case 'builder':
+        confidence += criteria.complexity >= 4 ? 0.35 : 0.1;
+        break;
+      case 'security':
+        confidence += criteria.complexity >= 5 ? 0.35 : 0.05;
+        break;
+      case 'qa':
+        confidence += criteria.hasTests ? 0.35 : 0.15;
+        break;
       case 'tester':
         confidence += criteria.hasTests ? 0.4 : 0;
         confidence += criteria.taskType === 'testing' ? 0.2 : 0;
@@ -167,6 +197,21 @@ export class RoleSystem {
         break;
       case 'implementer':
         reasons.push('Core implementation required');
+        break;
+      case 'frontend':
+        reasons.push('User-facing behavior needs dedicated ownership');
+        break;
+      case 'backend':
+        reasons.push('Data flow and integration logic need dedicated ownership');
+        break;
+      case 'builder':
+        reasons.push('Build and tooling stability need dedicated ownership');
+        break;
+      case 'security':
+        reasons.push('Security review is warranted for this level of complexity');
+        break;
+      case 'qa':
+        reasons.push('A dedicated verification pass improves confidence');
         break;
       case 'tester':
         if (criteria.hasTests) {
@@ -234,7 +279,9 @@ export class RoleSystem {
     }
 
     // Phase 3: Implementation (parallel with testing prep)
-    const implRoles = roles.filter((r) => r.type === 'implementer');
+    const implRoles = roles.filter((r) =>
+      r.type === 'implementer' || r.type === 'frontend' || r.type === 'backend' || r.type === 'builder'
+    );
     if (implRoles.length > 0) {
       phases.push({
         phase: phases.length + 1,
@@ -244,7 +291,9 @@ export class RoleSystem {
     }
 
     // Phase 4: Testing & Refactoring
-    const testRefactorRoles = roles.filter((r) => r.type === 'tester' || r.type === 'refactorer');
+    const testRefactorRoles = roles.filter((r) =>
+      r.type === 'tester' || r.type === 'qa' || r.type === 'refactorer' || r.type === 'security'
+    );
     if (testRefactorRoles.length > 0) {
       phases.push({
         phase: phases.length + 1,

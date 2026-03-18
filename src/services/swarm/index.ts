@@ -8,12 +8,13 @@ export * from './types';
 
 // Core components
 export { OrchestratorCore, orchestrator } from './OrchestratorCore';
-export { AgentManager } from './AgentManager';
+export { AgentManager, WORKER_CLI_OPTIONS, detectWorkerCLIAvailability } from './AgentManager';
 export { SwarmEventEmitter, swarmEvents } from './SwarmEventEmitter';
 
 // Role system
 export { RoleSystem } from './RoleSystem';
 export { AGENT_ROLES, getRole, getRolesByPriority, getRoleName, getRoleColor } from './roleDefinitions';
+export { claudeCoordinator, SWARM_SPECIALIST_ROLE_ORDER } from './ClaudeCoordinator';
 
 // Automation
 export { AutomationRulesEngine } from './AutomationRulesEngine';

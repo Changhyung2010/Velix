@@ -26,10 +26,10 @@ Built with React + TypeScript on the frontend, with both **Tauri** (Rust) and **
 
 **Multi-Agent Orchestration**
 - Automation panel — run multiple AI agents on complex, multi-step tasks
-- Claude Swarm — spawn and coordinate multiple agents automatically
-  - Task complexity analysis
-  - Human-in-the-loop approval queues
-  - Safe mode and dry-run controls
+- Swarm Mode — coordinator-led coding with scout, builder, and reviewer roles
+  - File ownership lanes to reduce overlap
+  - Real-time coordination board and sync rounds
+  - Review gates before work is considered done
   - Per-agent terminal views for full visibility
 
 **Git Integration**

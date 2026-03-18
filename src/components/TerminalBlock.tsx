@@ -1522,6 +1522,22 @@ No project is loaded. Tell the user to open a project folder so you can see thei
   ].filter(Boolean);
   const approvalAdded = (pendingEditApproval ?? []).reduce((sum, diff) => sum + diff.addedCount, 0);
   const approvalRemoved = (pendingEditApproval ?? []).reduce((sum, diff) => sum + diff.removedCount, 0);
+  const terminalSummary = totalChanges > 0
+    ? gitDetailParts.join(' · ') || `${totalChanges} pending changes`
+    : 'Working tree clean';
+  const aiSummary = editModeEnabled ? 'Edit mode on' : 'Edit mode off · approval required';
+  const inputPlaceholder = isAIProcessing
+    ? 'Waiting for AI response...'
+    : inputMode === 'ai'
+      ? currentFile
+        ? `Ask about ${currentFile.path.split('/').pop()} or the wider codebase...`
+        : 'Ask AI about the project, architecture, bugs, or commands...'
+      : 'Run a shell command...';
+  const submitLabel = isAIProcessing
+    ? (isAIStopping ? 'Stopping…' : 'Stop')
+    : inputMode === 'ai'
+      ? 'Ask'
+      : 'Run';
 
   return (
     <div className={`terminal-wrapper ${theme}`}>
@@ -1635,257 +1651,89 @@ No project is loaded. Tell the user to open a project folder so you can see thei
         </div>
       )}
 
-      {/* Bottom Input Card */}
       {!hideInputCard && (
-        <div className={`terminal-input-card ${inputMode === 'ai' ? 'ai-mode' : ''} ${isAIProcessing ? 'ai-processing' : ''}`}>
-          {/* Card Header Row 1 - Icon + Badges */}
-          <div className="card-header-row">
-            {inputMode === 'ai' && !isAIProcessing && (
-              <div className="ai-mode-indicator">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
-                </svg>
-                <span>AI Mode</span>
-              </div>
-            )}
-            {isAIProcessing && (
-              <div className="ai-processing-indicator">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
-                </svg>
-                <span>AI is thinking</span>
-                <div className="ai-processing-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <span className="ai-processing-elapsed">{formatElapsed(aiElapsedSec)}</span>
-                <button
-                  type="button"
-                  className="ai-stop-btn"
-                  onClick={handleStopAIResponse}
-                  disabled={isAIStopping}
-                  title="Stop AI response"
-                >
-                  {isAIStopping ? 'Stopping…' : 'Stop'}
-                </button>
-              </div>
-            )}
-            {inputMode !== 'ai' && !isAIProcessing && (
-              <>
-                <div className="terminal-mode-indicator">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="4 17 10 11 4 5" />
-                    <line x1="12" y1="19" x2="20" y2="19" />
-                  </svg>
-                  <span>Terminal Mode</span>
-                </div>
-                <div className="terminal-meta-chip path">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                  </svg>
-                  <span>~/{cwd?.split('/').pop() || 'Vexilo/Velix'}</span>
-                </div>
-                <button
-                  type="button"
-                  className={`terminal-meta-chip terminal-git-chip git ${totalChanges > 0 ? 'dirty' : 'clean'}`}
-                  onClick={() => onOpenGitPanel?.()}
-                  title="Open Git changes"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="6" y1="3" x2="6" y2="15" />
-                    <circle cx="18" cy="6" r="3" />
-                    <circle cx="6" cy="18" r="3" />
-                    <path d="M18 9a9 9 0 0 1-9 9" />
-                  </svg>
-                  <span>
-                    {totalChanges > 0
-                      ? `${totalChanges} change${totalChanges !== 1 ? 's' : ''}`
-                      : 'Clean'}
-                  </span>
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Animated loading bar - shown while AI is processing */}
+        <div className={`terminal-input-card compact ${inputMode === 'ai' ? 'ai-mode' : ''} ${isAIProcessing ? 'ai-processing' : ''}`}>
           {isAIProcessing && (
             <div className="ai-loading-bar">
               <div className="ai-loading-bar-fill" />
             </div>
           )}
 
-          {/* Card Header Row 2 - Git Stats or AI hints */}
-          {isAIProcessing ? null : inputMode === 'ai' ? (
-            <div className="card-git-row" style={{ justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7, fontSize: '11px' }}>
-                {currentFile
-                  ? `📄 AI can see ${currentFile.path.split('/').pop()} - try "optimize this code" or "explain this function"`
-                  : "Ask questions, get help with code, or say 'run npm install' to execute commands"
-                }
-              </span>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <span style={{ opacity: 0.6, fontSize: '10px' }}>
-                  {editModeEnabled ? 'Edit Mode: ON' : 'Edit Mode: OFF (approval required)'}
-                </span>
-                <span style={{ opacity: 0.5, fontSize: '10px' }}>
-                  Ctrl+T: Terminal | Ctrl+A: AI | Tab: Toggle
-                </span>
-                {aiConversation.length > 0 && (
-                  <button
-                    type="button"
-                    className="icon-btn-tiny"
-                    onClick={() => setAiConversation([])}
-                    title="Clear AI conversation history"
-                    style={{ width: 'auto', padding: '2px 8px', fontSize: '10px' }}
-                  >
-                    Clear history
-                  </button>
-                )}
-              </div>
+          <form className="terminal-input-form" onSubmit={handleInputSubmit}>
+            <button
+              type="button"
+              className={`terminal-mode-pill ${inputMode === 'ai' ? 'ai' : 'terminal'}`}
+              onClick={() => setInputMode((prev) => prev === 'ai' ? 'terminal' : 'ai')}
+              title="Toggle between terminal and AI mode"
+            >
+              {isAIProcessing ? `AI ${formatElapsed(aiElapsedSec)}` : inputMode === 'ai' ? 'AI' : 'SH'}
+            </button>
+
+            <div className="terminal-input-main">
+              <input
+                type="text"
+                className="card-main-input compact"
+                placeholder={inputPlaceholder}
+                ref={inputRef}
+                value={inputValue}
+                onChange={handleInputChange}
+                disabled={isAIProcessing}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleInputSubmit(e);
+                  } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    if (commandSuggestion && inputMode === 'terminal') {
+                      setInputValue(commandSuggestion);
+                      setCommandSuggestion('');
+                    } else {
+                      setInputMode((prev) => prev === 'ai' ? 'terminal' : 'ai');
+                    }
+                  } else if (e.key === 'Escape') {
+                    setCommandSuggestion('');
+                  } else if (e.key === 'ArrowRight' && commandSuggestion && inputMode === 'terminal') {
+                    const atEnd = (inputRef.current?.selectionStart ?? inputValue.length) === inputValue.length;
+                    if (atEnd) {
+                      e.preventDefault();
+                      setInputValue(commandSuggestion);
+                      setCommandSuggestion('');
+                    } else {
+                      e.preventDefault();
+                      termRef.current?.focus();
+                    }
+                  } else if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+                    e.preventDefault();
+                    setInputMode('terminal');
+                    setCommandSuggestion('');
+                  } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    setInputMode('ai');
+                    setCommandSuggestion('');
+                  } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft'].includes(e.key)) {
+                    e.preventDefault();
+                    termRef.current?.focus();
+                  }
+                }}
+              />
             </div>
-          ) : (
-            <div className="terminal-mode-row">
+
+            {inputMode === 'terminal' && (
               <button
                 type="button"
-                className="terminal-mode-summary terminal-mode-summary-btn"
+                className={`terminal-mini-chip terminal-git-chip git ${totalChanges > 0 ? 'dirty' : 'clean'}`}
                 onClick={() => onOpenGitPanel?.()}
                 title="Open Git changes"
               >
-                <span className="terminal-mode-summary-title">
-                  {totalChanges > 0
-                    ? `${totalChanges} working tree change${totalChanges !== 1 ? 's' : ''}`
-                    : 'Working tree clean'}
-                </span>
-                <span className="terminal-mode-summary-subtitle">
-                  {gitDetailParts.length > 0
-                    ? gitDetailParts.join(' · ')
-                    : 'Run shell commands directly in this terminal'}
-                </span>
+                {totalChanges > 0 ? `${totalChanges} changes` : 'Clean'}
               </button>
-              <div className="terminal-shortcut-row">
-                <span className="terminal-shortcut-chip">Enter: Run</span>
-                <span className="terminal-shortcut-chip">Tab: Toggle AI</span>
-                <span className="terminal-shortcut-chip">Ctrl+A: AI</span>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Main Input Field */}
-          <input
-            type="text"
-            className="card-main-input"
-            placeholder={
-              isAIProcessing
-                ? "Waiting for AI response..."
-                : inputMode === 'ai'
-                  ? (currentFile
-                    ? `Ask about ${currentFile.path.split('/').pop()} or any code question...`
-                    : "Ask AI anything... e.g. How do I fix this error?")
-                  : "Run a shell command... (Tab to switch to AI)"
-            }
-            ref={inputRef}
-            value={inputValue}
-            onChange={handleInputChange}
-            disabled={isAIProcessing}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleInputSubmit(e);
-              } else if (e.key === 'Tab') {
-                e.preventDefault();
-                if (commandSuggestion && inputMode === 'terminal') {
-                  // Accept the suggestion
-                  setInputValue(commandSuggestion);
-                  setCommandSuggestion('');
-                } else {
-                  // Toggle AI mode
-                  setInputMode(prev => prev === 'ai' ? 'terminal' : 'ai');
-                }
-              } else if (e.key === 'Escape') {
-                // Dismiss suggestion
-                setCommandSuggestion('');
-              } else if (e.key === 'ArrowRight' && commandSuggestion && inputMode === 'terminal') {
-                const atEnd = (inputRef.current?.selectionStart ?? inputValue.length) === inputValue.length;
-                if (atEnd) {
-                  // Accept suggestion with right arrow at end of input
-                  e.preventDefault();
-                  setInputValue(commandSuggestion);
-                  setCommandSuggestion('');
-                } else {
-                  e.preventDefault();
-                  termRef.current?.focus();
-                }
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 't') {
-                // Ctrl+T to force terminal mode
-                e.preventDefault();
-                setInputMode('terminal');
-                setCommandSuggestion('');
-              } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                // Ctrl+A to force AI mode
-                e.preventDefault();
-                setInputMode('ai');
-                setCommandSuggestion('');
-              } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft'].includes(e.key)) {
-                // Don't handle arrow keys in input - let terminal handle them
-                e.preventDefault();
-                termRef.current?.focus();
-              }
-            }}
-            onFocus={() => {
-              // When input is focused, make sure we're not blocking terminal input
-              if (termRef.current) {
-                // Don't steal focus if user is trying to use terminal
-              }
-            }}
-          />
-
-          {/* AI command suggestion row */}
-          {commandSuggestion && inputMode === 'terminal' && !isAIProcessing && (
-            <div className="command-suggestion-row" onClick={() => {
-              setInputValue(commandSuggestion);
-              setCommandSuggestion('');
-              inputRef.current?.focus();
-            }}>
-              <span className="suggestion-preview">{commandSuggestion}</span>
-              <div className="suggestion-controls">
-                <kbd className="suggestion-kbd">Tab</kbd>
-                <span className="suggestion-accept-label">to accept</span>
-              </div>
-            </div>
-          )}
-
-          {/* Bottom Icon Bar */}
-          <form className="card-bottom-bar" onSubmit={handleInputSubmit}>
-            <button
-              type="button"
-              className={`icon-btn-tiny ${inputMode === 'terminal' ? 'active' : ''}`}
-              onClick={() => setInputMode('terminal')}
-              title="Force Terminal mode (run commands) - Press Ctrl+T"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="4 17 10 11 4 5" />
-                <line x1="12" y1="19" x2="20" y2="19" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`icon-btn-tiny ai-toggle ${inputMode === 'ai' ? 'active' : ''}`}
-              onClick={() => setInputMode(inputMode === 'ai' ? 'terminal' : 'ai')}
-              title="Force AI mode (ask questions, get help) - Press Ctrl+A or Tab to toggle"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
-              </svg>
-            </button>
             <button
               type="button"
               className={`icon-btn-tiny ${isListening ? 'listening' : ''}`}
               onClick={toggleVoiceInput}
-              title="Voice"
+              title="Voice input"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -1894,56 +1742,34 @@ No project is loaded. Tell the user to open a project folder so you can see thei
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
             </button>
+
             <button
               type="button"
-              className={`edit-mode-btn ${editModeEnabled ? 'on' : 'off'}`}
+              className={`edit-mode-btn compact ${editModeEnabled ? 'on' : 'off'}`}
               onClick={toggleEditMode}
-              title={
-                editModeEnabled
-                  ? "Edit Mode ON - AI can propose edits without pre-approval"
-                  : "Edit Mode OFF - AI must ask before proposing edits"
-              }
+              title={editModeEnabled ? 'Edit Mode ON' : 'Edit Mode OFF'}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="5" y="11" width="14" height="10" rx="2" />
-                {editModeEnabled ? (
-                  <path d="M9 11V8a4 4 0 0 1 7.5-2" />
-                ) : (
-                  <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                )}
-              </svg>
-              <span>Edit {editModeEnabled ? 'ON' : 'OFF'}</span>
+              <span>{editModeEnabled ? 'Edit ON' : 'Edit OFF'}</span>
             </button>
 
             {reviewFileChanges.length > 0 && (
               <button
                 type="button"
-                className="review-files-btn"
+                className="review-files-btn compact"
                 onClick={handleOpenReviewPanel}
                 title="Review AI-applied file changes"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 3h7v7H3z" />
-                  <path d="M14 3h7v7h-7z" />
-                  <path d="M14 14h7v7h-7z" />
-                  <path d="M3 14h7v7H3z" />
-                </svg>
-                <span>Review files ({reviewFileChanges.length})</span>
+                <span>Review {reviewFileChanges.length}</span>
               </button>
             )}
 
-            {/* Model picker */}
             <div className="model-picker-wrap" ref={modelPickerRef}>
               <button
                 type="button"
-                className={`model-picker-btn ${showModelPicker ? 'open' : ''}`}
-                onClick={() => setShowModelPicker(v => !v)}
+                className={`model-picker-btn compact ${showModelPicker ? 'open' : ''}`}
+                onClick={() => setShowModelPicker((visible) => !visible)}
                 title="Change AI model"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83" />
-                </svg>
                 <span className="model-picker-label">
                   {currentAIConfig.model || 'No model'}
                 </span>
@@ -1954,13 +1780,12 @@ No project is loaded. Tell the user to open a project folder so you can see thei
 
               {showModelPicker && (
                 <div className="model-picker-dropdown">
-                  {PROVIDERS.map(provider => {
-                    // Check if provider is configured
+                  {PROVIDERS.map((provider) => {
                     const isConfigured = aiService.isProviderReady(provider.id);
                     return (
                       <div key={provider.id} className="model-picker-group">
                         <div className="model-picker-group-label">{provider.name}</div>
-                        {provider.models.map(model => {
+                        {provider.models.map((model) => {
                           const isActive = currentAIConfig.provider === provider.id && currentAIConfig.model === model;
                           return (
                             <button
@@ -1985,12 +1810,43 @@ No project is loaded. Tell the user to open a project folder so you can see thei
                           );
                         })}
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
             </div>
+
+            <button
+              type={isAIProcessing ? 'button' : 'submit'}
+              className="terminal-submit-btn"
+              onClick={isAIProcessing ? handleStopAIResponse : undefined}
+              disabled={isAIStopping}
+            >
+              {submitLabel}
+            </button>
           </form>
+
+          {commandSuggestion && inputMode === 'terminal' && !isAIProcessing && (
+            <div
+              className="command-suggestion-row compact"
+              onClick={() => {
+                setInputValue(commandSuggestion);
+                setCommandSuggestion('');
+                inputRef.current?.focus();
+              }}
+            >
+              <span className="suggestion-preview">{commandSuggestion}</span>
+              <div className="suggestion-controls">
+                <kbd className="suggestion-kbd">Tab</kbd>
+                <span className="suggestion-accept-label">accept</span>
+              </div>
+            </div>
+          )}
+
+          <div className="terminal-compact-status">
+            <span>{inputMode === 'ai' ? aiSummary : terminalSummary}</span>
+            <span>{inputMode === 'ai' ? 'Ctrl+A AI · Ctrl+T shell' : 'Tab toggles AI · Enter runs'}</span>
+          </div>
         </div>
       )}
     </div>

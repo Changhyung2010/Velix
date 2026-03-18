@@ -402,14 +402,13 @@
 .terminal-scroll-area {
   flex: 1 1 0;
   overflow: hidden;
-  padding: 10px 10px 6px 10px;
+  padding: 0 0 4px 0;
   margin: 0;
   min-height: 0;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  /* slightly lighter than terminal bg so the frame shows */
-  background: var(--bg-secondary);
+  background: var(--bg-terminal);
 }
 
 /* Styled frame / window that wraps the xterm canvas */
@@ -419,11 +418,9 @@
   margin: 0;
   padding: 0;
   overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid var(--border-default);
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.3),
-    inset 0 2px 0 0 var(--accent-primary);   /* teal top-accent line */
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .terminal-scroll-area .xterm {
@@ -444,17 +441,21 @@
   margin: 0 !important;
 }
 
+.terminal-scroll-area .xterm-screen canvas {
+  left: 0 !important;
+}
+
 /* Override xterm internals — clip to rounded container */
 .terminal-wrapper .xterm {
   padding: 0;
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .terminal-wrapper .xterm-viewport {
   overflow-y: auto !important;
   background-color: var(--bg-terminal) !important;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .terminal-wrapper .xterm-screen {
@@ -485,6 +486,13 @@
 .terminal-input-card:focus-within {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px var(--glow-primary);
+}
+
+.terminal-input-card.compact {
+  margin: 6px 10px 10px;
+  padding: 8px 10px;
+  gap: 6px;
+  border-radius: 12px;
 }
 
 /* Responsive adjustments */
@@ -638,6 +646,12 @@
   border: 1px solid rgba(34, 197, 94, 0.28);
 }
 
+.terminal-mini-chip.git.clean {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
 .app.light .terminal-meta-chip.git.clean {
   color: #16a34a;
 }
@@ -646,6 +660,12 @@
   background: rgba(255, 185, 80, 0.12);
   color: var(--accent-yellow);
   border: 1px solid rgba(255, 185, 80, 0.28);
+}
+
+.terminal-mini-chip.git.dirty {
+  background: rgba(255, 185, 80, 0.12);
+  color: var(--accent-yellow);
+  border-color: rgba(255, 185, 80, 0.28);
 }
 
 .terminal-git-chip:hover {
@@ -836,6 +856,11 @@
   color: var(--text-hint);
 }
 
+.card-main-input.compact {
+  padding: 0;
+  min-height: 24px;
+}
+
 @media (max-width: 768px) {
   .card-main-input {
     font-size: 11px;
@@ -857,6 +882,111 @@
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+}
+
+.terminal-input-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.terminal-input-main {
+  display: flex;
+  align-items: center;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.terminal-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glow);
+  background: var(--bg-active);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.terminal-mode-pill.terminal {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  background: var(--bg-hover);
+}
+
+.terminal-mini-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.terminal-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 72px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.terminal-submit-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.terminal-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.terminal-compact-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.terminal-compact-status span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .edit-mode-btn {
@@ -891,6 +1021,19 @@
 
 .edit-mode-btn:hover {
   opacity: 0.9;
+}
+
+.edit-mode-btn.compact,
+.review-files-btn.compact,
+.model-picker-btn.compact {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+}
+
+.edit-mode-btn.compact span,
+.review-files-btn.compact span {
+  white-space: nowrap;
 }
 
 .review-files-btn {
@@ -936,6 +1079,10 @@
   transition: all 0.15s;
   white-space: nowrap;
   max-width: 200px;
+}
+
+.model-picker-btn.compact {
+  max-width: 180px;
 }
 
 .model-picker-btn:hover,
@@ -1050,11 +1197,35 @@
   .card-bottom-bar {
     gap: 4px;
   }
+
+  .terminal-input-form {
+    gap: 6px;
+  }
+
+  .terminal-compact-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 
 @media (max-width: 480px) {
   .card-bottom-bar {
     gap: 3px;
+  }
+
+  .terminal-input-card.compact {
+    margin: 6px 8px 8px;
+    padding: 7px 8px;
+  }
+
+  .terminal-mode-pill,
+  .terminal-mini-chip,
+  .terminal-submit-btn,
+  .edit-mode-btn.compact,
+  .review-files-btn.compact,
+  .model-picker-btn.compact {
+    height: 30px;
   }
 }
 
@@ -1132,6 +1303,10 @@
   border-color: var(--accent-primary);
 }
 
+.command-suggestion-row.compact {
+  padding: 5px 8px;
+}
+
 .suggestion-preview {
   flex: 1;
   min-width: 0;
@@ -1187,7 +1362,7 @@
   opacity: 1;
 }
 
-.terminal-input-card.ai-processing .ai-stop-btn {
+.terminal-input-card.ai-processing .terminal-submit-btn {
   pointer-events: auto;
 }
 

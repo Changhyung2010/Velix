@@ -157,8 +157,6 @@ interface SettingsProps {
     currentConfig: AIConfig | null;
     theme: "light" | "dark";
     onThemeChange: (theme: "light" | "dark") => void;
-    tabSize: number;
-    onTabSizeChange: (size: number) => void;
 }
 
 export interface AIConfig {
@@ -170,7 +168,7 @@ export interface AIConfig {
 // Free providers that don't strictly require a paid plan
 const FREE_PROVIDERS = new Set(["groq", "mistral"]);
 
-export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThemeChange, tabSize, onTabSizeChange }: SettingsProps) {
+export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThemeChange }: SettingsProps) {
     const [activeTab, setActiveTab] = useState<"providers" | "appearance" | "about">("providers");
     const [selectedProvider, setSelectedProvider] = useState<AIProvider["id"]>(currentConfig?.provider || "claude");
     const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
@@ -380,21 +378,6 @@ export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThem
                                             <span className="theme-icon">&#9790;</span>
                                             <span className="theme-label">Dark</span>
                                         </button>
-                                    </div>
-                                </div>
-
-                                <div className="appearance-section">
-                                    <h4>Tab Size</h4>
-                                    <div className="theme-toggle-container">
-                                        {[2, 4, 8].map(size => (
-                                            <button
-                                                key={size}
-                                                className={`theme-option ${tabSize === size ? "active" : ""}`}
-                                                onClick={() => onTabSizeChange(size)}
-                                            >
-                                                <span className="theme-label">{size} spaces</span>
-                                            </button>
-                                        ))}
                                     </div>
                                 </div>
 

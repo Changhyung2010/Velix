@@ -126,10 +126,10 @@ export class AIService {
         // Append project/file context to the system prompt if provided
         if (options?.projectContents && Object.keys(options.projectContents).length > 0) {
             const fileSnippet = Object.entries(options.projectContents)
-                .slice(0, 30)
+                .slice(0, 10)                   // max 10 files
                 .map(([path, content]) => {
                     const ext = path.split('.').pop() || 'text';
-                    return `--- ${path} ---\n\`\`\`${ext}\n${content.slice(0, 3000)}\n\`\`\``;
+                    return `--- ${path} ---\n\`\`\`${ext}\n${content.slice(0, 1200)}\n\`\`\``; // 1200 chars/file
                 })
                 .join('\n\n');
 
@@ -137,11 +137,13 @@ export class AIService {
         } else if (options?.fileContext) {
             const fc = options.fileContext;
             systemPrompt = (systemPrompt || '') +
-                `\n\n=== CURRENT FILE: ${fc.path} ===\n\`\`\`${fc.language}\n${fc.content.slice(0, 15000)}\n\`\`\``;
+                `\n\n=== CURRENT FILE: ${fc.path} ===\n\`\`\`${fc.language}\n${fc.content.slice(0, 4000)}\n\`\`\``; // 4000 chars
         }
 
         const sessionID = await this.ensureSession();
-        const history = this.sessionHistory.get(sessionID) ?? [];
+        // Keep the last 6 turns (3 user + 3 assistant) to cap context growth.
+        const fullHistory = this.sessionHistory.get(sessionID) ?? [];
+        const history = fullHistory.slice(-6);
 
         const responseText = await opencodeClient.sendMessage({
             sessionID,
@@ -151,6 +153,7 @@ export class AIService {
             velixModelID: model,
             apiKey,
             messageHistory: history,
+            maxTokens: options?.maxTokens,
             onStream: options?.stream ? options.onStream : undefined,
             signal: options?.signal,
         });

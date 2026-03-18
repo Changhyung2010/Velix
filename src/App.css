@@ -14,116 +14,108 @@
 }
 
 /* ========== LIGHT THEME ========== */
-/* Color scheme: #063737 (teal), #0C120C (black), #ECEBF3 (white) */
+/* Warm cream/parchment — professional, paper-like quality */
 .app.light {
-  --bg-primary: #F5F5F0;
-  --bg-secondary: #EAEAE5;
-  --bg-sidebar: #E8E8E3;
-  --bg-input: #FFFFFF;
-  --bg-code: #EAEAE5;
-  --bg-terminal: #F5F5F0;
-  --bg-terminal-topbar: #E8E8E3;
-  --bg-hover: rgba(6, 55, 55, 0.1);
-  --bg-active: rgba(6, 55, 55, 0.18);
+  --bg-primary: #faf7f0;
+  --bg-secondary: #f2ebe0;
+  --bg-sidebar: #ece4d5;
+  --bg-input: #ffffff;
+  --bg-code: #f2ebe0;
+  --bg-terminal: #faf7f0;
+  --bg-terminal-topbar: #f2ebe0;
+  --bg-hover: rgba(90, 65, 30, 0.07);
+  --bg-active: rgba(6, 80, 80, 0.12);
 
-  --border-light: #D5D5D0;
-  --border-default: #C5C5C0;
-  --border-glow: rgba(6, 55, 55, 0.25);
+  --border-light: #ddd4c0;
+  --border-default: #cfc5ae;
+  --border-glow: rgba(6, 80, 80, 0.22);
 
-  --text-primary: #0C120C;
-  --text-secondary: #3D3D3D;
-  --text-muted: #5A5A5A;
-  --text-hint: #7A7A7A;
-  --text-faint: #C5C5C0;
+  --text-primary: #271e10;
+  --text-secondary: #5a4a36;
+  --text-muted: #8a7660;
+  --text-hint: #a89070;
+  --text-faint: #cfc0a8;
 
-  /* Primary accent: teal #063737 - more vibrant for light mode */
   --accent-primary: #065E5E;
   --accent-primary-light: #088080;
   --accent-primary-dark: #043F3F;
 
-  /* Semantic colors with better visibility */
   --accent-blue: #065E5E;
   --accent-cyan: #088080;
   --accent-green: #065E5E;
   --accent-purple: #065E5E;
   --accent-pink: #065E5E;
-  --accent-red: #DC2626;
-  --accent-yellow: #CA8A04;
-  --accent-orange: #EA580C;
+  --accent-red: #C0392B;
+  --accent-yellow: #B7791F;
+  --accent-orange: #C05621;
 
-  --glow-blue: rgba(6, 94, 94, 0.25);
-  --glow-green: rgba(6, 94, 94, 0.25);
-  --glow-purple: rgba(6, 94, 94, 0.25);
-  --glow-primary: rgba(6, 94, 94, 0.3);
+  --glow-blue: rgba(6, 94, 94, 0.22);
+  --glow-green: rgba(6, 94, 94, 0.22);
+  --glow-purple: rgba(6, 94, 94, 0.22);
+  --glow-primary: rgba(6, 94, 94, 0.28);
 
   --gradient-accent: linear-gradient(135deg, #043F3F 0%, #065E5E 100%);
-  --gradient-terminal: linear-gradient(180deg, #F5F5F0 0%, #EAEAE5 100%);
+  --gradient-terminal: linear-gradient(180deg, #faf7f0 0%, #f2ebe0 100%);
 
-  /* Button states with better visibility */
   --btn-primary-bg: #065E5E;
   --btn-primary-hover: #088080;
   --btn-primary-active: #043F3F;
-  --btn-secondary-bg: #f5f5f5;
-  --btn-secondary-hover: #e5e5e5;
+  --btn-secondary-bg: #f2ebe0;
+  --btn-secondary-hover: #ece4d5;
 
   color: var(--text-primary);
   background: var(--bg-primary);
 }
 
 /* ========== DARK THEME ========== */
-/* Same color logic as light: warm neutrals + deep teal. No green cast on backgrounds. */
+/* Neutral dark gray — professional, no warm/green tint */
 .app.dark {
-  /* Warm dark backgrounds — R ≥ G, B slightly lower, same "warm neutral" philosophy as light */
-  --bg-primary: #141412;
-  --bg-secondary: #1C1C1A;
-  --bg-sidebar: #111110;
-  --bg-input: #1F1F1D;
-  --bg-code: #191917;
-  --bg-terminal: #141412;
-  --bg-terminal-topbar: #1C1C1A;
-  --bg-hover: rgba(6, 94, 94, 0.2);
-  --bg-active: rgba(6, 94, 94, 0.38);
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252525;
+  --bg-sidebar: #181818;
+  --bg-input: #2a2a2a;
+  --bg-code: #222222;
+  --bg-terminal: #1e1e1e;
+  --bg-terminal-topbar: #252525;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(13, 148, 136, 0.18);
 
-  --border-light: #272725;
-  --border-default: #333331;
-  --border-glow: rgba(10, 133, 133, 0.4);
+  --border-light: #2e2e2e;
+  --border-default: #3c3c3c;
+  --border-glow: rgba(13, 148, 136, 0.35);
 
-  /* Warm white text — intentionally mirrors light mode's warm bg palette */
-  --text-primary: #EAEAE5;
-  --text-secondary: #ADADAD;
-  --text-muted: #797977;
-  --text-hint: #575755;
-  --text-faint: #383836;
+  --text-primary: #d4d4d4;
+  --text-secondary: #9e9e9e;
+  --text-muted: #626262;
+  --text-hint: #484848;
+  --text-faint: #323232;
 
-  /* Primary accent: same teal hue as light, scaled for dark-bg contrast */
-  --accent-primary: #0A8585;
-  --accent-primary-light: #12A2A2;
-  --accent-primary-dark: #065E5E;
+  --accent-primary: #0D9488;
+  --accent-primary-light: #14B8A6;
+  --accent-primary-dark: #0F766E;
 
-  /* Semantic colors — same hue family as light, brightened for dark bg */
-  --accent-blue: #0A8585;
-  --accent-cyan: #12A2A2;
-  --accent-green: #0A8585;
-  --accent-purple: #0A8585;
-  --accent-pink: #0A8585;
-  --accent-red: #EF5350;
-  --accent-yellow: #EAB308;
-  --accent-orange: #EA6C20;
+  --accent-blue: #0D9488;
+  --accent-cyan: #14B8A6;
+  --accent-green: #0D9488;
+  --accent-purple: #0D9488;
+  --accent-pink: #0D9488;
+  --accent-red: #F87171;
+  --accent-yellow: #FBBF24;
+  --accent-orange: #FB923C;
 
-  --glow-blue: rgba(10, 133, 133, 0.35);
-  --glow-green: rgba(10, 133, 133, 0.35);
-  --glow-purple: rgba(10, 133, 133, 0.35);
-  --glow-primary: rgba(10, 133, 133, 0.45);
+  --glow-blue: rgba(13, 148, 136, 0.3);
+  --glow-green: rgba(13, 148, 136, 0.3);
+  --glow-purple: rgba(13, 148, 136, 0.3);
+  --glow-primary: rgba(13, 148, 136, 0.38);
 
-  --gradient-accent: linear-gradient(135deg, #065E5E 0%, #0A8585 100%);
-  --gradient-terminal: linear-gradient(180deg, #1C1C1A 0%, #141412 100%);
+  --gradient-accent: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
+  --gradient-terminal: linear-gradient(180deg, #252525 0%, #1e1e1e 100%);
 
-  /* Button states */
-  --btn-primary-bg: #0A8585;
-  --btn-primary-hover: #12A2A2;
-  --btn-primary-active: #065E5E;
-  --btn-secondary-bg: #1C1C1A;
-  --btn-secondary-hover: #272725;
+  --btn-primary-bg: #0D9488;
+  --btn-primary-hover: #14B8A6;
+  --btn-primary-active: #0F766E;
+  --btn-secondary-bg: #252525;
+  --btn-secondary-hover: #2e2e2e;
 
   color: var(--text-primary);
   background: var(--bg-primary);
@@ -271,7 +263,7 @@ html, body, #root {
 
 .app {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 48px minmax(0, 1fr);
   grid-template-rows: 1fr 22px;
   width: 100%;
   max-width: 100vw;
@@ -280,31 +272,6 @@ html, body, #root {
   gap: 0;
   margin: 0;
   padding: 0;
-}
-
-/* Responsive layout for smaller screens */
-@media (max-width: 900px) {
-  .app {
-    grid-template-columns: 220px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 768px) {
-  .app {
-    grid-template-columns: 196px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .app {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .app {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
 }
 
 /* ========== SIDEBAR ========== */
@@ -320,6 +287,12 @@ html, body, #root {
   min-width: 248px;
   max-width: 248px;
   border-right: 1px solid var(--border-default);
+}
+
+.sidebar.sidebar-compact {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
 }
 
 .app.dark .sidebar {
@@ -370,6 +343,8 @@ html, body, #root {
 /* ========== ACTIVITY BAR ========== */
 
 .activity-bar {
+  grid-row: 1;
+  grid-column: 1;
   width: 48px;
   min-width: 48px;
   max-width: 48px;
@@ -380,6 +355,7 @@ html, body, #root {
   border-right: 1px solid var(--border-light);
   padding: 8px 0;
   gap: 0;
+  z-index: 1;
 }
 
 .app.dark .activity-bar {
@@ -1653,7 +1629,7 @@ html, body, #root {
 
 .status-bar {
   grid-row: 2;
-  grid-column: 2;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1808,12 +1784,29 @@ html, body, #root {
   display: flex;
   align-items: center;
   height: 36px;
-  padding: 0 0 0 0;
+  padding: 0 0 0 14px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-default);
-  gap: 0;
+  gap: 10px;
   flex-shrink: 0;
   overflow: hidden;
+}
+
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding-right: 2px;
+}
+
+.topbar-tools .activity-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.topbar-tools .activity-btn-wrap {
+  width: auto;
 }
 
 .app.dark .terminal-topbar {
@@ -1828,6 +1821,64 @@ html, body, #root {
   flex-shrink: 0;
 }
 
+.workspace-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 280px;
+  flex-shrink: 1;
+}
+
+.workspace-open-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.workspace-open-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  transform: none;
+}
+
+.workspace-summary {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.workspace-name {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-family: var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-path {
+  color: var(--text-hint);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Responsive terminal topbar */
 @media (max-width: 768px) {
   .terminal-topbar {
@@ -1835,8 +1886,25 @@ html, body, #root {
     gap: 8px;
   }
 
+  .topbar-tools {
+    gap: 2px;
+  }
+
+  .topbar-tools .activity-btn {
+    width: 28px;
+    height: 28px;
+  }
+
   .terminal-topbar-actions {
     gap: 8px;
+  }
+
+  .workspace-bar {
+    max-width: 46%;
+  }
+
+  .workspace-path {
+    display: none;
   }
 
   .model-selector,
@@ -1857,6 +1925,17 @@ html, body, #root {
 @media (max-width: 640px) {
   .terminal-tabs {
     display: none;
+  }
+
+  .topbar-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-right: 6px;
+  }
+
+  .workspace-bar {
+    max-width: none;
+    flex: 1;
   }
 
   .model-selector {
@@ -1933,7 +2012,9 @@ html, body, #root {
   display: flex;
   flex: 0 0 0%;
   width: 0;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-secondary);
   transition: flex-basis 0.35s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1952,7 +2033,9 @@ html, body, #root {
 .right-panel.open > * {
   animation: panelSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
   width: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 /* Responsive right panel */

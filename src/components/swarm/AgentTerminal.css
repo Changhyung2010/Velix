@@ -98,12 +98,41 @@
   color: #EF4444;
 }
 
-/* ── Task Label ──────────────────────────────────── */
-.agent-task-label {
-  padding: 4px 10px;
-  font-size: 11px;
-  color: var(--text-secondary);
+/* ── Work Summary ────────────────────────────────── */
+.agent-work-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
   background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+}
+
+.agent-work-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.agent-work-copy {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.agent-ownership-label {
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-default);
   white-space: nowrap;
   overflow: hidden;
@@ -190,4 +219,3 @@
   opacity: 0.3;
   cursor: not-allowed;
 }
-

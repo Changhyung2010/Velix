@@ -10,6 +10,7 @@ import {
   AgentStatus,
   AgentMetrics,
   PatternMatch,
+  WorkerCLI,
 } from './types';
 import { SwarmEventEmitter } from './SwarmEventEmitter';
 import { aiService } from '../ai/AIService';
@@ -24,12 +25,101 @@ interface PTYExit {
   exit_code: number | null;
 }
 
+
 const MAX_OUTPUT_BUFFER = 500; // Lines to keep in memory per agent
+
+// Patterns that indicate a CLI is showing its input prompt and ready for a message
+const CLI_READY_PATTERNS = [
+  /^\s*>\s*$/m,          // Claude Code: bare ">"
+  /^\s*>\s+$/m,          // Claude Code: "> " with trailing space
+  /╭─+╮/,               // Claude Code welcome box top border
+  /Type your message/i,  // Some versions show this hint
+  /\$\s*$/m,             // Fallback: shell prompt (Claude wasn't found, shell is ready)
+];
+
+const ANSI_ESCAPE_REGEX = /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])|\u009B[0-?]*[ -/]*[@-~]/g;
+
+const sanitizeTerminalOutput = (data: string): string =>
+  data
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(ANSI_ESCAPE_REGEX, '')
+    .replace(/[\u0000-\u0008\u000B-\u001A\u001C-\u001F\u007F]/g, '');
+
+export const WORKER_CLI_OPTIONS: Array<{
+  id: WorkerCLI;
+  name: string;
+  command: string;
+  description: string;
+}> = [
+  {
+    id: 'claude',
+    name: 'Claude Code',
+    command: 'claude',
+    description: 'Anthropic Claude Code CLI',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini CLI',
+    command: 'gemini',
+    description: 'Google Gemini terminal agent',
+  },
+  {
+    id: 'opencode',
+    name: 'OpenCode',
+    command: 'opencode',
+    description: 'OpenCode CLI',
+  },
+  {
+    id: 'codex',
+    name: 'Codex CLI',
+    command: 'codex',
+    description: 'OpenAI Codex CLI',
+  },
+  {
+    id: 'copilot',
+    name: 'Copilot CLI',
+    command: 'copilot',
+    description: 'GitHub Copilot CLI',
+  },
+];
+
+export interface WorkerCLIStatus {
+  available: boolean;
+  detail: string;
+}
+
+const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\"'\"'`)}'`;
+
+export async function detectWorkerCLIAvailability(
+  _cwd: string,
+): Promise<Record<WorkerCLI, WorkerCLIStatus>> {
+  const entries = await Promise.all(
+    WORKER_CLI_OPTIONS.map(async (option) => {
+      try {
+        // check_cli_available resolves the full login-shell PATH (including nvm /
+        // homebrew / cargo) and also scans common install locations directly.
+        const path = await invoke<string>('check_cli_available', {
+          command: option.command,
+        });
+        return [option.id, { available: true, detail: path }] as const;
+      } catch {
+        return [
+          option.id,
+          { available: false, detail: 'Not found in PATH' },
+        ] as const;
+      }
+    }),
+  );
+
+  return Object.fromEntries(entries) as Record<WorkerCLI, WorkerCLIStatus>;
+}
 
 export class AgentManager {
   private agents: Map<string, Agent> = new Map();
   private eventEmitter: SwarmEventEmitter;
   private workspacePath: string;
+  private workerCLI: WorkerCLI = 'claude';
   private outputListeners: Map<string, UnlistenFn> = new Map();
   private exitListeners: Map<string, UnlistenFn> = new Map();
   private globalOutputListener: UnlistenFn | null = null;
@@ -37,10 +127,21 @@ export class AgentManager {
   private outputCallbacks: Array<(agentId: string, data: string) => void> = [];
   private exitCallbacks: Array<(agentId: string, exitCode: number | null) => void> = [];
   private patternDetector: ((output: string) => PatternMatch | null) | null = null;
+  // Prompts waiting to be delivered once the CLI shows its ready indicator
+  private pendingPrompts: Map<string, string> = new Map();
+  private pendingPromptTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   constructor(eventEmitter: SwarmEventEmitter, workspacePath: string) {
     this.eventEmitter = eventEmitter;
     this.workspacePath = workspacePath;
+  }
+
+  setWorkerCLI(workerCLI: WorkerCLI): void {
+    this.workerCLI = workerCLI;
+  }
+
+  getWorkerCLI(): WorkerCLI {
+    return this.workerCLI;
   }
 
   /**
@@ -110,15 +211,26 @@ export class AgentManager {
   /**
    * Handle output from an agent's PTY session
    */
-  private handleAgentOutput(agentId: string, data: string): void {
+  private async handleAgentOutput(agentId: string, data: string): Promise<void> {
     const agent = this.agents.get(agentId);
     if (!agent) return;
+    const sanitizedData = sanitizeTerminalOutput(data);
+
+    // If the CLI hasn't received its first prompt yet, check whether it's ready
+    if (this.pendingPrompts.has(agentId)) {
+      const isReady = CLI_READY_PATTERNS.some((pattern) => pattern.test(sanitizedData));
+      if (isReady) {
+        await this.deliverPendingPrompt(agent);
+      }
+    }
 
     // Update last activity
     agent.lastActivityAt = new Date();
 
     // Add to output buffer
-    const lines = data.split('\n');
+    const lines = sanitizedData
+      .split('\n')
+      .map((line) => line.trimEnd());
     agent.outputBuffer.push(...lines);
     if (agent.outputBuffer.length > MAX_OUTPUT_BUFFER) {
       agent.outputBuffer = agent.outputBuffer.slice(-MAX_OUTPUT_BUFFER);
@@ -128,12 +240,12 @@ export class AgentManager {
     this.eventEmitter.emitAgentEvent({
       type: 'output',
       agentId,
-      data,
+      data: sanitizedData,
     });
 
     // Check for patterns
     if (this.patternDetector) {
-      const match = this.patternDetector(data);
+      const match = this.patternDetector(sanitizedData);
       if (match) {
         agent.metrics.promptsProcessed++;
         this.eventEmitter.emitAgentEvent({
@@ -147,7 +259,7 @@ export class AgentManager {
     // Notify callbacks
     for (const callback of this.outputCallbacks) {
       try {
-        callback(agentId, data);
+        callback(agentId, sanitizedData);
       } catch (error) {
         console.error('AgentManager: Error in output callback:', error);
       }
@@ -202,34 +314,39 @@ export class AgentManager {
   /**
    * Spawn a new agent with a specific role and task
    */
-  async spawnAgent(role: AgentRole, task: string): Promise<Agent> {
+  async spawnAgent(
+    role: AgentRole,
+    task: string,
+    options?: {
+      assignmentId?: string;
+      label?: string;
+      ownedFiles?: string[];
+    },
+  ): Promise<Agent> {
     const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const sessionId = `swarm_${agentId}`;
 
-    // Create PTY session
+    // Create PTY session — shell starts in the workspace directory automatically
     await invoke('pty_create', {
       sessionId,
-      rows: 24,
-      cols: 80,
+      rows: 50,
+      cols: 220,
       cwd: this.workspacePath,
     });
 
-    // Build the Claude CLI command with the prompt
+    // Build the prompt text (to be typed AFTER the CLI starts)
     const prompt = this.buildPrompt(role, task);
-    const escapedPrompt = prompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
-    // Pass the currently selected model if using the anthropic provider
-    const config = aiService.getConfig();
-    let command = `claude "${escapedPrompt}"\r`;
-    if (config.provider === 'claude' && config.model) {
-      command = `claude -m ${config.model} "${escapedPrompt}"\r`;
-    }
+    // Step 1: just open the CLI interactively
+    const startCommand = this.buildWorkerStartCommand();
 
     // Create agent object
     const agent: Agent = {
       id: agentId,
       role,
       sessionId,
+      assignmentId: options?.assignmentId,
+      label: options?.label,
+      ownedFiles: options?.ownedFiles || [],
       status: 'initializing',
       assignedTask: task,
       startedAt: new Date(),
@@ -247,11 +364,20 @@ export class AgentManager {
 
     this.agents.set(agentId, agent);
 
-    // Send command to PTY
+    // Step 1: open the CLI (e.g. `claude --dangerously-skip-permissions`)
     await invoke('pty_write', {
       sessionId,
-      data: command,
+      data: startCommand,
     });
+
+    // Step 2: store the prompt — it will be sent once the CLI shows its ready indicator.
+    // A fallback timer fires after 6 s in case the ready pattern isn't detected.
+    this.pendingPrompts.set(agentId, prompt);
+    const fallbackTimer = setTimeout(() => {
+      const a = this.agents.get(agentId);
+      if (a) this.deliverPendingPrompt(a);
+    }, 6000);
+    this.pendingPromptTimers.set(agentId, fallbackTimer);
 
     // Update status
     agent.status = 'running';
@@ -285,6 +411,72 @@ ${contextInfo}
 ${role.initialPrompt}
 
 Task: ${task}`;
+  }
+
+  /**
+   * Build the command that opens the CLI in interactive mode.
+   * The task prompt is NOT passed here — it is typed in after the CLI starts.
+   */
+  private buildWorkerStartCommand(): string {
+    const config = aiService.getConfig();
+    const parts: string[] = [];
+
+    switch (this.workerCLI) {
+      case 'claude':
+        parts.push('claude', '--dangerously-skip-permissions');
+        if (config.provider === 'claude' && config.model) {
+          parts.push('-m', config.model);
+        }
+        break;
+      case 'gemini':
+        parts.push('gemini');
+        if (config.provider === 'gemini' && config.model) {
+          parts.push('-m', config.model);
+        }
+        break;
+      case 'codex':
+        parts.push('codex');
+        if (config.provider === 'chatgpt' && config.model) {
+          parts.push('-m', config.model);
+        }
+        break;
+      case 'opencode':
+        parts.push('opencode');
+        break;
+      case 'copilot':
+        parts.push('copilot');
+        break;
+      default:
+        parts.push('claude', '--dangerously-skip-permissions');
+        break;
+    }
+
+    return parts.join(' ') + '\r';
+  }
+
+  /**
+   * Deliver a pending prompt to an agent whose CLI is now ready for input.
+   */
+  private async deliverPendingPrompt(agent: Agent): Promise<void> {
+    const prompt = this.pendingPrompts.get(agent.id);
+    if (!prompt) return;
+
+    this.pendingPrompts.delete(agent.id);
+
+    const timer = this.pendingPromptTimers.get(agent.id);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingPromptTimers.delete(agent.id);
+    }
+
+    try {
+      await invoke('pty_write', {
+        sessionId: agent.sessionId,
+        data: `${prompt}\r`,
+      });
+    } catch (error) {
+      console.error(`AgentManager: failed to deliver prompt to agent ${agent.id}:`, error);
+    }
   }
 
   /**
@@ -334,6 +526,14 @@ Task: ${task}`;
     }
 
     agent.status = 'terminated';
+
+    // Cancel any pending prompt delivery
+    this.pendingPrompts.delete(agentId);
+    const timer = this.pendingPromptTimers.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingPromptTimers.delete(agentId);
+    }
 
     this.eventEmitter.emitAgentEvent({
       type: 'terminated',

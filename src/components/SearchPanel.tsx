@@ -11,7 +11,7 @@ interface SearchMatch {
 
 interface SearchPanelProps {
   currentDir: string;
-  onResultClick: (file: string, line: number) => void;
+  onResultClick?: (file: string, line: number) => void;
 }
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({ currentDir, onResultClick }) => {
@@ -125,7 +125,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({ currentDir, onResultCl
                 <div
                   key={`${file}-${match.line}-${idx}`}
                   className="search-match"
-                  onClick={() => onResultClick(file, match.line)}
+                  onClick={() => onResultClick?.(file, match.line)}
                 >
                   <span className="match-line-num">{match.line}:</span>
                   <span className="match-text">{match.text.trim()}</span>

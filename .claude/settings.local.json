@@ -32,7 +32,10 @@
       "Bash(perl -i -pe:*)",
       "Bash(claude --version)",
       "Bash(npm config:*)",
-      "Bash(git -C /Users/changhyunglee/Vexilo/Velix diff HEAD electron/main.cjs)"
+      "Bash(git -C /Users/changhyunglee/Vexilo/Velix diff HEAD electron/main.cjs)",
+      "Bash(command -v:*)",
+      "Bash(/bin/zsh:*)",
+      "Bash(/bin/zsh -ic \"command -v claude\")"
     ]
   }
 }

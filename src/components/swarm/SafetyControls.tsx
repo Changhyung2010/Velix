@@ -98,7 +98,7 @@ export const SafetyControls: React.FC<SafetyControlsProps> = ({
         </div>
         <div className="info-item">
           <span className="info-icon">[A]</span>
-          <span>Max agents: 5</span>
+          <span>Max agents: 8</span>
         </div>
       </div>
     </div>

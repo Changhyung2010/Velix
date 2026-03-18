@@ -20,7 +20,7 @@ import { SafetyLimiter } from './SafetyLimiter';
 import { aiService } from '../ai/AIService';
 
 const DEFAULT_CONFIG: OrchestratorConfig = {
-  maxAgents: 5,
+  maxAgents: 8,
   maxRuntime: 600000, // 10 minutes
   maxRetries: 3,
   dryRunMode: false,

@@ -1,46 +1,59 @@
-/* SwarmPanel — Agent Manager Styles */
-
 .swarm-panel {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
   background: var(--bg-primary);
   overflow: hidden;
 }
 
-/* ── Header ─────────────────────────────────────── */
+.swarm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .swarm-header {
-  height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-secondary);
   flex-shrink: 0;
 }
 
-.swarm-header h2 {
+.swarm-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.swarm-header-copy h2 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
   color: var(--text-primary);
-  flex: 1;
+}
+
+.swarm-header-copy span {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
   width: 28px;
   height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  line-height: 1;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
 }
 
 .close-btn:hover {
@@ -48,77 +61,398 @@
   color: var(--text-primary);
 }
 
-/* ── Spawn Bar ───────────────────────────────────── */
-.spawn-bar {
+.swarm-planner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-default);
+  background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
+  flex-shrink: 0;
+}
+
+.swarm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.swarm-section-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.swarm-section-head h3 {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.swarm-section-head span {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.swarm-goal-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 12px 13px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.swarm-goal-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--glow-primary);
+}
+
+.swarm-config-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.swarm-count-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border-default);
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.swarm-count-control input {
+  flex: 1;
+}
+
+.swarm-count-control strong {
+  color: var(--accent-primary);
+  font-size: 14px;
+}
+
+.swarm-runtime-hint {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.swarm-role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.swarm-cli-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.swarm-role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.swarm-cli-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.swarm-role-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.swarm-cli-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.swarm-role-card.selected {
+  border-color: var(--accent-primary);
+  background: var(--bg-active);
+  box-shadow: 0 0 0 1px var(--glow-primary);
+}
+
+.swarm-cli-card.selected {
+  border-color: var(--accent-primary);
+  background: var(--bg-active);
+  box-shadow: 0 0 0 1px var(--glow-primary);
+}
+
+.swarm-role-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.swarm-role-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.swarm-role-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.swarm-role-caption {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.swarm-role-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.swarm-role-rule {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.swarm-role-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
   background: var(--bg-primary);
   flex-shrink: 0;
 }
 
-.spawn-input {
-  flex: 1;
+.swarm-stepper-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  padding: 7px 10px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  outline: none;
-  transition: border-color 0.15s;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
 }
 
-.spawn-input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.7;
+.swarm-stepper-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
-.spawn-input:focus {
-  border-color: var(--accent-primary);
-}
-
-.spawn-input:disabled {
-  opacity: 0.5;
+.swarm-stepper-btn:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
-.spawn-btn {
-  padding: 7px 14px;
+.swarm-stepper-value {
+  min-width: 16px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.swarm-cli-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.swarm-cli-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.swarm-cli-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.swarm-cli-badge.available {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10B981;
+}
+
+.swarm-cli-badge.unavailable {
+  background: rgba(239, 68, 68, 0.14);
+  color: #EF4444;
+}
+
+.swarm-cli-command {
+  font-size: 10px;
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+}
+
+.swarm-cli-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.swarm-cli-detail {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swarm-principles-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.swarm-principle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.swarm-principle-card strong {
+  font-size: 10px;
+  color: var(--accent-primary);
+  letter-spacing: 0.08em;
+}
+
+.swarm-principle-card span {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.swarm-requirement {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 185, 80, 0.35);
+  background: rgba(255, 185, 80, 0.12);
+  color: var(--accent-yellow);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.swarm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.swarm-primary-btn,
+.swarm-secondary-btn,
+.swarm-danger-btn {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+}
+
+.swarm-primary-btn:hover:not(:disabled),
+.swarm-secondary-btn:hover:not(:disabled),
+.swarm-danger-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.swarm-primary-btn {
   background: var(--accent-primary);
   color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity 0.15s;
 }
 
-.spawn-btn:hover:not(:disabled) {
-  opacity: 0.85;
+.swarm-secondary-btn {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
-.spawn-btn:disabled {
-  opacity: 0.4;
+.swarm-danger-btn {
+  background: transparent;
+  color: var(--accent-red);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.swarm-primary-btn:disabled,
+.swarm-secondary-btn:disabled,
+.swarm-danger-btn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
 }
 
-/* ── Error Bar ───────────────────────────────────── */
 .swarm-error-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
   background: rgba(239, 68, 68, 0.12);
-  border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   color: var(--accent-red);
-  font-size: 12px;
-  flex-shrink: 0;
+  font-size: 11px;
 }
 
 .swarm-error-bar button {
@@ -127,66 +461,280 @@
   color: inherit;
   cursor: pointer;
   font-size: 16px;
-  padding: 0 2px;
-  opacity: 0.7;
 }
 
-.swarm-error-bar button:hover {
-  opacity: 1;
-}
-
-/* ── Status Bar ──────────────────────────────────── */
-.agents-status-bar {
+.swarm-status-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 12px;
+  gap: 12px;
+  padding: 8px 24px;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
   flex-shrink: 0;
 }
 
-.agent-count {
+.swarm-coordinator-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.swarm-coordinator-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.swarm-coordinator-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+}
+
+.swarm-board-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.swarm-board-summary strong {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.swarm-board-summary p {
+  margin: 0;
   font-size: 11px;
+  line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.swarm-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.swarm-board-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+}
+
+.swarm-task-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   font-family: var(--font-mono);
 }
 
-.kill-all-btn {
-  padding: 3px 8px;
-  background: none;
-  border: 1px solid var(--accent-red);
-  color: var(--accent-red);
-  border-radius: 4px;
+.swarm-task-status.queued {
+  background: rgba(107, 114, 128, 0.12);
+  color: var(--text-muted);
+}
+
+.swarm-task-status.mapping {
+  background: rgba(15, 118, 110, 0.14);
+  color: #0F766E;
+}
+
+.swarm-task-status.building {
+  background: rgba(37, 99, 235, 0.14);
+  color: #2563EB;
+}
+
+.swarm-task-status.review {
+  background: rgba(180, 83, 9, 0.14);
+  color: #B45309;
+}
+
+.swarm-task-status.done {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10B981;
+}
+
+.swarm-task-status.blocked {
+  background: rgba(239, 68, 68, 0.14);
+  color: #EF4444;
+}
+
+.swarm-task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.swarm-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.swarm-task-head strong {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.swarm-task-head span {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.swarm-task-main p {
+  margin: 0;
   font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
-.kill-all-btn:hover {
-  background: var(--accent-red);
-  color: white;
+.swarm-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
-/* ── Agents List ─────────────────────────────────── */
-.agents-list {
-  flex: 1;
+.swarm-task-ownership {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swarm-coordinator-summary {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.swarm-plan-snippet strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.swarm-plan-snippet p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.swarm-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
   overflow-y: auto;
-  padding: 10px;
+}
+
+.swarm-log-entry {
+  display: flex;
+  gap: 10px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.swarm-log-entry.plan {
+  border-left: 2px solid var(--accent-primary);
+}
+
+.swarm-log-entry.sync {
+  border-left: 2px solid #3B82F6;
+}
+
+.swarm-log-entry.dispatch {
+  border-left: 2px solid #10B981;
+}
+
+.swarm-log-entry.error {
+  border-left: 2px solid #EF4444;
+}
+
+.swarm-log-time {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.swarm-log-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.swarm-log-copy strong {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.swarm-log-copy span {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.agents-list {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 14px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* ── Empty State ─────────────────────────────────── */
 .agents-empty {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  min-height: 240px;
+  padding: 32px 20px;
   text-align: center;
   color: var(--text-secondary);
   gap: 4px;
@@ -194,20 +742,551 @@
 
 .agents-empty-icon {
   font-size: 32px;
-  margin-bottom: 12px;
-  opacity: 0.3;
+  margin-bottom: 10px;
+  opacity: 0.28;
 }
 
 .agents-empty p {
   margin: 0;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
 }
 
 .agents-empty-sub {
-  font-size: 12px !important;
-  font-weight: 400 !important;
+  font-size: 11px !important;
   opacity: 0.7;
-  margin-top: 4px !important;
+  line-height: 1.5;
+  max-width: 440px;
+}
+
+@media (max-width: 960px) {
+  .swarm-config-row,
+  .swarm-coordinator-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .swarm-role-grid,
+  .swarm-cli-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .swarm-role-grid,
+  .swarm-cli-grid,
+  .swarm-principles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .swarm-actions {
+    flex-direction: column;
+  }
+
+  .swarm-primary-btn,
+  .swarm-secondary-btn,
+  .swarm-danger-btn {
+    width: 100%;
+  }
+
+  .swarm-board-row {
+    grid-template-columns: 1fr;
+  }
+
+  .swarm-task-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* =====================================================
+   SPLIT LAYOUT — left mindmap + right controls
+   ===================================================== */
+
+.swarm-split-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.swarm-mindmap-pane {
+  flex: 0 0 50%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  position: relative;
+}
+
+.swarm-control-pane {
+  flex: 0 0 50%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Reduce side padding since control pane is now 50% wide */
+.swarm-control-pane .swarm-planner,
+.swarm-control-pane .swarm-status-strip,
+.swarm-control-pane .swarm-coordinator-board,
+.swarm-control-pane .agents-list {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* Stack coordinator board vertically in the narrower pane */
+.swarm-control-pane .swarm-coordinator-board {
+  grid-template-columns: 1fr;
+}
+
+/* =====================================================
+   SWARM MIND MAP component
+   ===================================================== */
+
+.swarm-mindmap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+}
+
+.swarm-mindmap.smm-dragging {
+  cursor: grabbing;
+}
+
+.smm-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--border-light);
+  opacity: 0.5;
+}
+
+.smm-wires {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.smm-hex-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- Shared node base ---- */
+.smm-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+  /* Centered on the (left, top) coordinate */
+  transform: translate(-50%, -50%);
+}
+
+/* ---- SVG text (shared for both coordinator and agent nodes) ---- */
+.smm-svg-title {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--text-primary);
+  font-family: inherit;
+}
+
+.smm-svg-sub {
+  font-size: 8.5px;
+  fill: var(--accent-primary);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.smm-svg-role {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  /* fill is set inline via style prop */
+}
+
+/* ---- Coordinator node (no longer needs custom HTML text rules) ---- */
+.smm-coordinator-node {
+  pointer-events: none;
+}
+
+/* ---- Agent node ---- */
+.smm-agent-ring-svg {
+  display: block;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.smm-agent-node {
+  /* width/height now set inline to match agentRingSvgSize */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.smm-node-badge {
+  display: block;
+  margin-top: 5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- Empty state ---- */
+.smm-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* =====================================================
+   RESPONSIVE — collapse mindmap below 900px
+   ===================================================== */
+
+@media (max-width: 900px) {
+  .swarm-split-body {
+    flex-direction: column;
+  }
+  .swarm-mindmap-pane {
+    flex: 0 0 240px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-default);
+  }
+  .swarm-control-pane {
+    flex: 1 1 auto;
+  }
+}
+
+/* =====================================================
+   MINDMAP VIEWPORT + ZOOM
+   ===================================================== */
+
+.smm-viewport {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+/* Zoom controls HUD */
+.smm-zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.smm-zoom-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.12s;
+}
+
+.smm-zoom-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.smm-zoom-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: center;
+  padding: 0 2px;
+}
+
+/* =====================================================
+   AGENT NODE — clickable + selected state
+   ===================================================== */
+
+.smm-agent-node {
+  pointer-events: auto;
+  cursor: pointer !important; /* override container grab cursor */
+  transition: filter 0.15s;
+}
+
+.smm-agent-node:hover {
+  filter: brightness(1.1);
+}
+
+.smm-agent-node.smm-selected .smm-svg-title {
+  fill: var(--accent-primary);
+}
+
+/* =====================================================
+   AGENT CHAT POPOVER
+   ===================================================== */
+
+.smm-agent-chat {
+  position: absolute;
+  bottom: 48px;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.smm-agent-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-primary);
+}
+
+.smm-agent-chat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.smm-agent-chat-info strong {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.smm-agent-chat-info span {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.smm-agent-chat-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.smm-agent-chat-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.smm-agent-chat-notice {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.smm-agent-chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.smm-agent-chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.smm-agent-chat-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--glow-primary);
+}
+
+.smm-agent-chat-send {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.smm-agent-chat-send:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.smm-agent-chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =====================================================
+   ROLE PALETTE — drag chips onto the mindmap
+   ===================================================== */
+
+.smm-palette {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.smm-palette-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.smm-palette-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.smm-palette-chip:hover:not(.disabled) {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.smm-palette-chip:active:not(.disabled) {
+  cursor: grabbing;
+}
+
+.smm-palette-chip.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.smm-palette-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.smm-palette-name {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  text-transform: capitalize;
+  letter-spacing: 0.04em;
+}
+
+.smm-palette-count {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+/* =====================================================
+   DROP OVERLAY — shown while dragging a chip over mindmap
+   ===================================================== */
+
+.smm-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border: 2px dashed var(--accent-primary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.smm-drop-overlay-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--bg-secondary);
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-primary);
+}
+
+.smm-pane-drop-active {
+  box-shadow: inset 0 0 0 2px var(--accent-primary);
 }

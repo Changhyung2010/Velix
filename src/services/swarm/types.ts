@@ -27,11 +27,24 @@ export type AgentStatus =
   | 'failed'
   | 'terminated';
 
+export type WorkerCLI =
+  | 'claude'
+  | 'gemini'
+  | 'opencode'
+  | 'codex'
+  | 'copilot';
+
 // ============= Agent Roles =============
 
 export type AgentRoleType =
+  | 'scout'
   | 'planner'
   | 'architect'
+  | 'frontend'
+  | 'backend'
+  | 'builder'
+  | 'security'
+  | 'qa'
   | 'implementer'
   | 'tester'
   | 'refactorer'
@@ -82,6 +95,9 @@ export interface Agent {
   id: string;
   role: AgentRole;
   sessionId: string; // PTY session ID
+  assignmentId?: string;
+  label?: string;
+  ownedFiles?: string[];
   status: AgentStatus;
   assignedTask: string;
   startedAt: Date;

@@ -69,6 +69,7 @@ export class OpenCodeClient {
     velixModelID: string;
     apiKey: string;
     messageHistory?: Array<{ role: string; content: string }>;
+    maxTokens?: number;
     onStream?: (chunk: string) => void;
     signal?: AbortSignal;
   }): Promise<string> {
@@ -85,7 +86,7 @@ export class OpenCodeClient {
       apiKey: params.apiKey,
       messages,
       system: params.system,
-      maxTokens: 4096,
+      maxTokens: params.maxTokens ?? 2048,
     });
 
     // Deliver the full response to the stream callback so the UI renders it
