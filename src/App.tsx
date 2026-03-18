@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { open, invoke } from "./platform/native";
 import "./App.css";
 import { Settings, AIConfig, AI_PROVIDERS, AIProvider } from "./components/Settings";
@@ -116,16 +116,19 @@ function App() {
   const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
   const [paneDropPreview, setPaneDropPreview] = useState<{ tabId: string; index: number } | null>(null);
 
-  const activeWorkspaceTabId = workspaceTabs.some((tab) =>
-    tab.id === (activeTerminalId === "swarm" ? lastWorkspaceTabId : activeTerminalId),
-  )
-    ? (activeTerminalId === "swarm" ? lastWorkspaceTabId : activeTerminalId)
-    : (workspaceTabs[0]?.id || "");
-  const activeWorkspaceTab =
-    workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) || workspaceTabs[0] || null;
-  const currentDir = activeWorkspaceTab?.projectDir || "";
-  const workspaceContext = activeWorkspaceTab?.workspaceContext || null;
-  const currentBranch = activeWorkspaceTab?.currentBranch || "";
+  const activeWorkspaceTabId = useMemo(() => {
+    const targetId = activeTerminalId === "swarm" ? lastWorkspaceTabId : activeTerminalId;
+    return workspaceTabs.some((tab) => tab.id === targetId)
+      ? targetId
+      : (workspaceTabs[0]?.id || "");
+  }, [workspaceTabs, activeTerminalId, lastWorkspaceTabId]);
+  const activeWorkspaceTab = useMemo(
+    () => workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) || workspaceTabs[0] || null,
+    [workspaceTabs, activeWorkspaceTabId],
+  );
+  const currentDir = useMemo(() => activeWorkspaceTab?.projectDir || "", [activeWorkspaceTab]);
+  const workspaceContext = useMemo(() => activeWorkspaceTab?.workspaceContext || null, [activeWorkspaceTab]);
+  const currentBranch = useMemo(() => activeWorkspaceTab?.currentBranch || "", [activeWorkspaceTab]);
 
   const updateWorkspaceTab = useCallback((tabId: string, updater: (tab: WorkspaceTabState) => WorkspaceTabState) => {
     setWorkspaceTabs((prev) =>
@@ -898,7 +901,7 @@ Working directory: ${currentDir || "unknown"}`;
   const activeTerminalTitle = activeTerminalId === 'swarm'
     ? 'Swarm'
     : activeWorkspaceTitle;
-  const getPaneGridStyle = (paneCount: number) => {
+  const getPaneGridStyle = useCallback((paneCount: number) => {
     if (paneCount <= 1) return undefined;
     const columns = getPaneGridColumnCount(paneCount);
     const rows = Math.ceil(paneCount / columns);
@@ -906,7 +909,7 @@ Working directory: ${currentDir || "unknown"}`;
       gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
       gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
     };
-  };
+  }, []);
 
   return (
     <div className={`app ${theme}`}>

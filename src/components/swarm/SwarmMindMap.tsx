@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type NodeTone = 'queued' | 'mapping' | 'building' | 'review' | 'done' | 'blocked';
 
@@ -149,6 +149,7 @@ export const SwarmMindMap: React.FC<SwarmMindMapProps> = ({
     moved: false,
   });
   const suppressClickRef = useRef<string | null>(null);
+  const lastWheelTimeRef = useRef(0);
 
   const [size, setSize] = useState({ w: 500, h: 400 });
   const [zoom, setZoom] = useState(1);
@@ -263,6 +264,9 @@ export const SwarmMindMap: React.FC<SwarmMindMapProps> = ({
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
+    const now = Date.now();
+    if (now - lastWheelTimeRef.current < 16) return; // cap at ~60 fps
+    lastWheelTimeRef.current = now;
     const factor = event.deltaY < 0 ? 1.12 : 0.9;
     const nextZoom = clamp(Number((zoomRef.current * factor).toFixed(2)), MIN_ZOOM, MAX_ZOOM);
     zoomAtPoint(nextZoom, event.clientX, event.clientY);
@@ -276,92 +280,95 @@ export const SwarmMindMap: React.FC<SwarmMindMapProps> = ({
     return () => element.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  const resolvedNodes: ResolvedMindMapNode[] = nodes.map((node, index) => {
-    const center = denormalizeCanvasPoint(node.position || buildDefaultMindMapPosition(index, nodes.length));
-    return {
-      ...node,
-      center,
-      roleColor: ROLE_COLORS[node.role] ?? '#6B7280',
-      statusColor: TONE_COLORS[node.tone],
-    };
-  });
+  const resolvedNodes = useMemo<ResolvedMindMapNode[]>(() =>
+    nodes.map((node, index) => {
+      const center = denormalizeCanvasPoint(node.position || buildDefaultMindMapPosition(index, nodes.length));
+      return {
+        ...node,
+        center,
+        roleColor: ROLE_COLORS[node.role] ?? '#6B7280',
+        statusColor: TONE_COLORS[node.tone],
+      };
+    }),
+    [nodes, denormalizeCanvasPoint],
+  );
 
-  const nodesById = new Map(resolvedNodes.map((node) => [node.id, node]));
-  const incomingNodeIds = new Set(connections.map((connection) => connection.to));
-  const rootNodes = resolvedNodes.filter((node) => !incomingNodeIds.has(node.id));
+  const nodesById = useMemo(() => new Map(resolvedNodes.map((node) => [node.id, node])), [resolvedNodes]);
+  const incomingNodeIds = useMemo(() => new Set(connections.map((connection) => connection.to)), [connections]);
+  const rootNodes = useMemo(() => resolvedNodes.filter((node) => !incomingNodeIds.has(node.id)), [resolvedNodes, incomingNodeIds]);
+
+  const handlePointerMove = useCallback((event: PointerEvent) => {
+    const interaction = interactionRef.current;
+    if (interaction.mode === 'idle') return;
+    if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - interaction.startClientX;
+    const deltaY = event.clientY - interaction.startClientY;
+    if (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD) {
+      interaction.moved = true;
+    }
+
+    if (interaction.mode === 'pan') {
+      setPan({
+        x: interaction.initialPanX + deltaX,
+        y: interaction.initialPanY + deltaY,
+      });
+      return;
+    }
+
+    const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
+    if (!canvasPoint) return;
+
+    if (interaction.mode === 'node' && interaction.nodeId) {
+      const nextCenter = clampNodeCenter({
+        x: canvasPoint.x - (interaction.nodeOffsetX || 0),
+        y: canvasPoint.y - (interaction.nodeOffsetY || 0),
+      });
+      onNodeMove?.(interaction.nodeId, normalizeCanvasPoint(nextCenter));
+      return;
+    }
+
+    if (interaction.mode === 'connect' && interaction.fromNodeId) {
+      setConnectionPreview({
+        fromNodeId: interaction.fromNodeId,
+        point: canvasPoint,
+      });
+    }
+  }, [clampNodeCenter, getCanvasPointFromClient, normalizeCanvasPoint, onNodeMove]);
+
+  const finishInteraction = useCallback((event: PointerEvent) => {
+    const interaction = interactionRef.current;
+    if (interaction.mode === 'idle') return;
+    if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
+
+    if (interaction.mode === 'connect' && interaction.fromNodeId) {
+      const targetElement = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      const targetNode = targetElement?.closest('[data-smm-node-id]') as HTMLElement | null;
+      const targetNodeId = targetNode?.dataset.smmNodeId;
+
+      if (targetNodeId && targetNodeId !== interaction.fromNodeId) {
+        onConnect?.(interaction.fromNodeId, targetNodeId);
+      }
+    }
+
+    if (interaction.mode === 'node' && interaction.nodeId && interaction.moved) {
+      suppressClickRef.current = interaction.nodeId;
+    }
+
+    interactionRef.current = {
+      mode: 'idle',
+      pointerId: null,
+      startClientX: 0,
+      startClientY: 0,
+      initialPanX: 0,
+      initialPanY: 0,
+      moved: false,
+    };
+    setIsPanning(false);
+    setConnectionPreview(null);
+  }, [onConnect]);
 
   useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const interaction = interactionRef.current;
-      if (interaction.mode === 'idle') return;
-      if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
-
-      const deltaX = event.clientX - interaction.startClientX;
-      const deltaY = event.clientY - interaction.startClientY;
-      if (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD) {
-        interaction.moved = true;
-      }
-
-      if (interaction.mode === 'pan') {
-        setPan({
-          x: interaction.initialPanX + deltaX,
-          y: interaction.initialPanY + deltaY,
-        });
-        return;
-      }
-
-      const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
-      if (!canvasPoint) return;
-
-      if (interaction.mode === 'node' && interaction.nodeId) {
-        const nextCenter = clampNodeCenter({
-          x: canvasPoint.x - (interaction.nodeOffsetX || 0),
-          y: canvasPoint.y - (interaction.nodeOffsetY || 0),
-        });
-        onNodeMove?.(interaction.nodeId, normalizeCanvasPoint(nextCenter));
-        return;
-      }
-
-      if (interaction.mode === 'connect' && interaction.fromNodeId) {
-        setConnectionPreview({
-          fromNodeId: interaction.fromNodeId,
-          point: canvasPoint,
-        });
-      }
-    };
-
-    const finishInteraction = (event: PointerEvent) => {
-      const interaction = interactionRef.current;
-      if (interaction.mode === 'idle') return;
-      if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
-
-      if (interaction.mode === 'connect' && interaction.fromNodeId) {
-        const targetElement = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
-        const targetNode = targetElement?.closest('[data-smm-node-id]') as HTMLElement | null;
-        const targetNodeId = targetNode?.dataset.smmNodeId;
-
-        if (targetNodeId && targetNodeId !== interaction.fromNodeId) {
-          onConnect?.(interaction.fromNodeId, targetNodeId);
-        }
-      }
-
-      if (interaction.mode === 'node' && interaction.nodeId && interaction.moved) {
-        suppressClickRef.current = interaction.nodeId;
-      }
-
-      interactionRef.current = {
-        mode: 'idle',
-        pointerId: null,
-        startClientX: 0,
-        startClientY: 0,
-        initialPanX: 0,
-        initialPanY: 0,
-        moved: false,
-      };
-      setIsPanning(false);
-      setConnectionPreview(null);
-    };
-
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', finishInteraction);
     window.addEventListener('pointercancel', finishInteraction);
@@ -371,7 +378,7 @@ export const SwarmMindMap: React.FC<SwarmMindMapProps> = ({
       window.removeEventListener('pointerup', finishInteraction);
       window.removeEventListener('pointercancel', finishInteraction);
     };
-  }, [clampNodeCenter, getCanvasPointFromClient, normalizeCanvasPoint, onConnect, onNodeMove]);
+  }, [handlePointerMove, finishInteraction]);
 
   const startBackgroundPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;

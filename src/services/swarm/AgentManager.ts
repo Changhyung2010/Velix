@@ -65,10 +65,10 @@ export const WORKER_CLI_OPTIONS: Array<{
     description: 'Google Gemini terminal agent',
   },
   {
-    id: 'opencode',
-    name: 'OpenCode',
-    command: 'opencode',
-    description: 'OpenCode CLI',
+    id: 'velix',
+    name: 'Velix CLI',
+    command: 'velix',
+    description: 'Velix AI CLI',
   },
   {
     id: 'codex',
@@ -438,8 +438,8 @@ Task: ${task}`;
           parts.push('-m', config.model);
         }
         break;
-      case 'opencode':
-        parts.push('opencode');
+      case 'velix':
+        parts.push('velix');
         break;
       case 'copilot':
         parts.push('copilot');

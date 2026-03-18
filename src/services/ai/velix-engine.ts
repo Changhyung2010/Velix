@@ -1,8 +1,8 @@
 /**
- * AIClient - Direct AI provider client via Electron IPC.
+ * VelixEngine - Direct AI provider client via Electron IPC.
  *
- * Replaces the previous opencode HTTP server with direct calls to AI provider
- * APIs made from the Electron main process (which has no CORS restrictions).
+ * Handles all AI provider calls from the Electron main process
+ * (which has no CORS restrictions).
  */
 
 import { invoke } from '../../platform/native';
@@ -17,7 +17,7 @@ const MODEL_ID_MAP: Record<string, string> = {
   'gemini-2.0-flash': 'gemini-2.0-flash-001',
 };
 
-export class OpenCodeClient {
+export class VelixEngine {
   /** Map Velix model ID to actual provider model ID */
   toActualModelID(velixModelID: string): string {
     return MODEL_ID_MAP[velixModelID] ?? velixModelID;
@@ -104,4 +104,4 @@ export class OpenCodeClient {
 }
 
 // Singleton instance
-export const opencodeClient = new OpenCodeClient();
+export const velixEngine = new VelixEngine();

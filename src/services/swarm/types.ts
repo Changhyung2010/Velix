@@ -30,7 +30,7 @@ export type AgentStatus =
 export type WorkerCLI =
   | 'claude'
   | 'gemini'
-  | 'opencode'
+  | 'velix'
   | 'codex'
   | 'copilot';
 

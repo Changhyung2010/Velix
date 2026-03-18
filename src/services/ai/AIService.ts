@@ -1,6 +1,6 @@
 import { invoke } from '../../platform/native';
 import { ProviderID, PROVIDERS } from './types';
-import { opencodeClient } from './opencode-client';
+import { velixEngine } from './velix-engine';
 
 /**
  * AIService provides a unified interface to multiple AI providers.
@@ -78,7 +78,7 @@ export class AIService {
     /** Ensure we have an active session ID */
     private async ensureSession(): Promise<string> {
         if (!this.sessionID) {
-            this.sessionID = await opencodeClient.createSession();
+            this.sessionID = await velixEngine.createSession();
             this.sessionHistory.set(this.sessionID, []);
         }
         return this.sessionID;
@@ -145,7 +145,7 @@ export class AIService {
         const fullHistory = this.sessionHistory.get(sessionID) ?? [];
         const history = fullHistory.slice(-6);
 
-        const responseText = await opencodeClient.sendMessage({
+        const responseText = await velixEngine.sendMessage({
             sessionID,
             text: userMsg.content,
             system: systemPrompt,
@@ -181,9 +181,9 @@ export class AIService {
             throw new Error(`No API key configured for provider "${this.currentProvider}". Add one in Settings.`);
         }
 
-        const tempSessionID = await opencodeClient.createSession();
+        const tempSessionID = await velixEngine.createSession();
         try {
-            return await opencodeClient.sendMessage({
+            return await velixEngine.sendMessage({
                 sessionID: tempSessionID,
                 text: userContent,
                 system,
@@ -192,7 +192,7 @@ export class AIService {
                 apiKey,
             });
         } finally {
-            await opencodeClient.deleteSession(tempSessionID);
+            await velixEngine.deleteSession(tempSessionID);
         }
     }
 

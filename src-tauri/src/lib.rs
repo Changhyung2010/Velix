@@ -118,8 +118,8 @@ struct AppState {
     shell_cwd: Mutex<String>,
     pty_sessions: Mutex<HashMap<String, Arc<Mutex<PtySession>>>>,
     app_dir: Mutex<Option<PathBuf>>,
-    /// Handle to the opencode server child process
-    opencode_process: Mutex<Option<Child>>,
+    /// Handle to the Velix AI engine child process
+    velix_engine_process: Mutex<Option<Child>>,
 }
 
 impl AppState {
@@ -145,7 +145,7 @@ impl AppState {
             shell_cwd: Mutex::new(dirs_or_home()),
             pty_sessions: Mutex::new(HashMap::new()),
             app_dir: Mutex::new(app_dir),
-            opencode_process: Mutex::new(None),
+            velix_engine_process: Mutex::new(None),
         }
     }
 
@@ -1833,7 +1833,7 @@ async fn ai_chat(
         .to_string())
 }
 
-// ==================== OpenCode Server Management ====================
+// ==================== Velix Engine Management ====================
 
 /// Try to locate the `bun` executable in common paths.
 fn find_bun() -> Option<String> {
@@ -1860,19 +1860,19 @@ fn find_bun() -> Option<String> {
     None
 }
 
-/// Try to find the velixcode/packages/opencode directory.
+/// Try to find the velixcode/packages/engine directory.
 /// In dev mode, searches relative to cwd. In production, falls back to the
 /// app's resource directory (where the bundled velixcode is placed).
-fn find_opencode_dir(app: &AppHandle) -> Option<PathBuf> {
+fn find_velix_engine_dir(app: &AppHandle) -> Option<PathBuf> {
     // Dev: cwd is the Velix project root
     if let Ok(cwd) = std::env::current_dir() {
-        let candidate = cwd.join("velixcode/packages/opencode");
+        let candidate = cwd.join("velixcode/packages/engine");
         if candidate.exists() {
             return Some(candidate);
         }
         // Running from src-tauri/
         if let Some(parent) = cwd.parent() {
-            let candidate2 = parent.join("velixcode/packages/opencode");
+            let candidate2 = parent.join("velixcode/packages/engine");
             if candidate2.exists() {
                 return Some(candidate2);
             }
@@ -1880,7 +1880,7 @@ fn find_opencode_dir(app: &AppHandle) -> Option<PathBuf> {
     }
     // Production: look next to the app binary (resource dir)
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let candidate = resource_dir.join("velixcode/packages/opencode");
+        let candidate = resource_dir.join("velixcode/packages/engine");
         if candidate.exists() {
             return Some(candidate);
         }
@@ -1888,16 +1888,16 @@ fn find_opencode_dir(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
-/// Start the opencode server (velixcode engine) as a child process.
+/// Start the Velix AI engine as a child process.
 /// The server listens on http://localhost:4096.
 #[tauri::command]
-async fn start_opencode_server(
+async fn start_velix_engine(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     // Check if already running
     {
-        let proc = state.opencode_process.lock().map_err(|e| e.to_string())?;
+        let proc = state.velix_engine_process.lock().map_err(|e| e.to_string())?;
         if proc.is_some() {
             return Ok("http://localhost:4096".to_string());
         }
@@ -1908,14 +1908,14 @@ async fn start_opencode_server(
             .to_string()
     })?;
 
-    let opencode_dir = find_opencode_dir(&app).ok_or_else(|| {
-        "velixcode/packages/opencode directory not found. Make sure velixcode is in the Velix project root.".to_string()
+    let engine_dir = find_velix_engine_dir(&app).ok_or_else(|| {
+        "velixcode/packages/engine directory not found. Make sure velixcode is in the Velix project root.".to_string()
     })?;
 
-    let entry_point = opencode_dir.join("src/index.ts");
+    let entry_point = engine_dir.join("src/index.ts");
     if !entry_point.exists() {
         return Err(format!(
-            "opencode entry point not found at: {}",
+            "Velix engine entry point not found at: {}",
             entry_point.display()
         ));
     }
@@ -1927,35 +1927,35 @@ async fn start_opencode_server(
         .arg("serve")
         .arg("--port")
         .arg("4096")
-        .current_dir(&opencode_dir)
-        .env("OPENCODE_SERVER_PORT", "4096")
+        .current_dir(&engine_dir)
+        .env("VELIX_ENGINE_PORT", "4096")
         // Pipe stdout/stderr so they don't clutter the terminal
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .map_err(|e| format!("Failed to start opencode server: {}", e))?;
+        .map_err(|e| format!("Failed to start Velix engine: {}", e))?;
 
     {
-        let mut proc = state.opencode_process.lock().map_err(|e| e.to_string())?;
+        let mut proc = state.velix_engine_process.lock().map_err(|e| e.to_string())?;
         *proc = Some(child);
     }
 
     Ok("http://localhost:4096".to_string())
 }
 
-/// Stop the opencode server if it is running.
+/// Stop the Velix AI engine if it is running.
 #[tauri::command]
-async fn stop_opencode_server(state: State<'_, AppState>) -> Result<(), String> {
-    let mut proc = state.opencode_process.lock().map_err(|e| e.to_string())?;
+async fn stop_velix_engine(state: State<'_, AppState>) -> Result<(), String> {
+    let mut proc = state.velix_engine_process.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = proc.take() {
         let _ = child.kill();
     }
     Ok(())
 }
 
-/// Get the URL of the opencode server.
+/// Get the URL of the Velix AI engine.
 #[tauri::command]
-fn get_opencode_url() -> String {
+fn get_velix_engine_url() -> String {
     "http://localhost:4096".to_string()
 }
 
@@ -2003,9 +2003,9 @@ pub fn run() {
             ask_claude,
             ai_chat,
             read_project_source_files,
-            start_opencode_server,
-            stop_opencode_server,
-            get_opencode_url
+            start_velix_engine,
+            stop_velix_engine,
+            get_velix_engine_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   AgentManager,
   SwarmEventEmitter,
@@ -701,13 +701,19 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     );
   }, []);
 
-  const rolesToLaunch = buildRolesToLaunch(roleCounts);
-  const workerCount = rolesToLaunch.length;
-  const rolesReady = workerCount >= MIN_AGENTS && workerCount <= MAX_AGENTS;
-  const selectedWorkerCLIOption = WORKER_CLI_OPTIONS.find((option) => option.id === workerCLI) || WORKER_CLI_OPTIONS[0];
-  const selectedWorkerCLIStatus = workerCLIAvailability[workerCLI];
-  const runningCount = agents.filter((agent) => !FINISHED_STATUSES.has(agent.status)).length;
-  const canLaunch = Boolean(
+  const rolesToLaunch = useMemo(() => buildRolesToLaunch(roleCounts), [roleCounts]);
+  const workerCount = useMemo(() => rolesToLaunch.length, [rolesToLaunch]);
+  const rolesReady = useMemo(() => workerCount >= MIN_AGENTS && workerCount <= MAX_AGENTS, [workerCount]);
+  const selectedWorkerCLIOption = useMemo(
+    () => WORKER_CLI_OPTIONS.find((option) => option.id === workerCLI) || WORKER_CLI_OPTIONS[0],
+    [workerCLI],
+  );
+  const selectedWorkerCLIStatus = useMemo(() => workerCLIAvailability[workerCLI], [workerCLIAvailability, workerCLI]);
+  const runningCount = useMemo(
+    () => agents.filter((agent) => !FINISHED_STATUSES.has(agent.status)).length,
+    [agents],
+  );
+  const canLaunch = useMemo(() => Boolean(
     goal.trim() &&
     workspacePath &&
     hasClaudeKey &&
@@ -715,20 +721,27 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     !isCheckingWorkerCLI &&
     selectedWorkerCLIStatus?.available &&
     !isLaunching,
+  ), [goal, workspacePath, hasClaudeKey, rolesReady, isCheckingWorkerCLI, selectedWorkerCLIStatus, isLaunching]);
+  const workspaceName = useMemo(() => workspacePath ? getWorkspaceName(workspacePath) : 'workspace', [workspacePath]);
+  const previewAssignments = useMemo(() => buildPreviewAssignments(rolesToLaunch), [rolesToLaunch]);
+  const boardAssignmentsBase = useMemo(
+    () => coordinatorPlan?.assignments || previewAssignments,
+    [coordinatorPlan, previewAssignments],
   );
-  const workspaceName = workspacePath ? getWorkspaceName(workspacePath) : 'workspace';
-  const previewAssignments = buildPreviewAssignments(rolesToLaunch);
-  const boardAssignmentsBase = coordinatorPlan?.assignments || previewAssignments;
-  const boardAssignments = applyManualConnectionsToAssignments(boardAssignmentsBase, manualConnections);
-  const mindMapConnections = dedupeMindMapConnections([
+  const boardAssignments = useMemo(
+    () => applyManualConnectionsToAssignments(boardAssignmentsBase, manualConnections),
+    [boardAssignmentsBase, manualConnections],
+  );
+  const mindMapConnections = useMemo(() => dedupeMindMapConnections([
     ...buildAutomaticMindMapConnections(boardAssignmentsBase),
     ...manualConnections,
-  ]);
-  const agentsByAssignment = new Map(
-    agents.map((agent) => [agent.assignmentId || agent.id, agent]),
+  ]), [boardAssignmentsBase, manualConnections]);
+  const agentsByAssignment = useMemo(
+    () => new Map(agents.map((agent) => [agent.assignmentId || agent.id, agent])),
+    [agents],
   );
 
-  const mindMapNodes: MindMapNode[] = boardAssignments.map((assignment) => {
+  const mindMapNodes = useMemo<MindMapNode[]>(() => boardAssignments.map((assignment) => {
     const agent = agentsByAssignment.get(assignment.id);
     const { label, tone } = getAssignmentState(assignment, agent);
     return {
@@ -740,9 +753,12 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
       workingOn: buildWorkSummary(agent?.assignedTask || assignment.task, assignment.role as SwarmLaunchRole),
       position: nodePositions[assignment.id],
     };
-  });
+  }), [boardAssignments, agentsByAssignment, nodePositions]);
 
-  const boardAssignmentIdsKey = boardAssignmentsBase.map((assignment) => assignment.id).join('|');
+  const boardAssignmentIdsKey = useMemo(
+    () => boardAssignmentsBase.map((assignment) => assignment.id).join('|'),
+    [boardAssignmentsBase],
+  );
 
   const handleMindMapRoleDrop = useCallback((roleValue: string, position: MindMapPosition) => {
     const role = ROLE_ORDER.find((candidate) => candidate === roleValue);

@@ -22,7 +22,6 @@ Built with React + TypeScript on the frontend, with both **Tauri** (Rust) and **
 - Full workspace context — AI reads your project structure and files
 - Inline assistance from the terminal — ask, create, edit, refactor
 - Voice chat for hands-free interaction (requires OpenAI API key)
-- Powered by [OpenCode](https://opencode.ai), an open-source AI coding agent
 
 **Multi-Agent Orchestration**
 - Automation panel — run multiple AI agents on complex, multi-step tasks
@@ -122,7 +121,7 @@ velix/
 | Frontend | React 19, TypeScript, Vite |
 | Desktop | Tauri 2 (Rust), Electron (Node.js) |
 | Terminal | xterm.js + node-pty |
-| AI Engine | OpenCode |
+| AI Engine | Custom multi-provider agent |
 | Styling | CSS custom properties, JetBrains Mono, Inter |
 
 ---
@@ -132,12 +131,6 @@ velix/
 Recommended: [VS Code](https://code.visualstudio.com/) with these extensions:
 - [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
 - [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
----
-
-## Credits
-
-Velix is built on [**OpenCode**](https://opencode.ai) by [Anomaly](https://github.com/anomalyco/opencode) — an open-source AI coding agent that powers the context engine, multi-provider routing, and agent orchestration.
 
 ---
 

@@ -1,3 +1,3 @@
 export * from './types';
 export { aiService, AIService } from './AIService';
-export { opencodeClient, OpenCodeClient } from './opencode-client';
+export { velixEngine, VelixEngine } from './velix-engine';

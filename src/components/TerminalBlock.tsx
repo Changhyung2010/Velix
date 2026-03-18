@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle, useMemo } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import {
@@ -710,7 +710,7 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   }, [createPtySession, writeToPty, resizePty, killPtySession, theme]);
 
   // Read npm scripts from workspace context or project file contents
-  const getNpmScripts = useCallback((): string[] => {
+  const npmScripts = useMemo((): string[] => {
     const pkgContent =
       wsContext?.loadedFiles?.['package.json'] ||
       projectFileContents?.['package.json'];
@@ -729,7 +729,6 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   const fetchAISuggestion = useCallback(async (input: string, requestId: number) => {
     if (!aiEnabled || !aiService.isProviderReady()) return;
     try {
-      const npmScripts = getNpmScripts();
       const messages: ChatMessage[] = [
         {
           role: 'system',
@@ -753,7 +752,7 @@ ${npmScripts.length > 0 ? `Available npm scripts: ${npmScripts.join(', ')}.` : '
     } catch {
       // Suggestions are best-effort — ignore errors silently
     }
-  }, [aiEnabled, getNpmScripts]);
+  }, [aiEnabled, npmScripts]);
 
   // Handle input change and detect mode
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -773,7 +772,6 @@ ${npmScripts.length > 0 ? `Available npm scripts: ${npmScripts.join(', ')}.` : '
         }
 
         // Try local suggestions first (instant, no API call)
-        const npmScripts = getNpmScripts();
         const localSuggestion = getLocalCommandSuggestion(value, npmScripts);
         if (localSuggestion) {
           setCommandSuggestion(localSuggestion);
@@ -1007,7 +1005,7 @@ No project is loaded. Tell the user to open a project folder so you can see thei
     let assistantMsgId = '';
     let accumulated = '';
     let isFirstChunk = true;
-    let typingInterval: ReturnType<typeof setInterval> | null = null;
+    let typingInterval: number | null = null;
     let streamRafId: number | null = null;
 
     try {
@@ -1040,12 +1038,19 @@ No project is loaded. Tell the user to open a project folder so you can see thei
       let spinnerIdx = 0;
       const dim = '\x1b[38;5;245m', reset = '\x1b[0m';
       term.write(`${dim}${spinners[0]} ${statusPhases[0]}${reset}`);
-      typingInterval = setInterval(() => {
-        spinnerIdx = (spinnerIdx + 1) % spinners.length;
-        dotCount++;
-        if (dotCount % 16 === 0) phaseIdx = (phaseIdx + 1) % statusPhases.length;
-        term.write(`\r${dim}${spinners[spinnerIdx]} ${statusPhases[phaseIdx]}${reset}\x1b[K`);
-      }, 120);
+      let lastSpinMs = Date.now();
+      const spinFrame = () => {
+        const now = Date.now();
+        if (now - lastSpinMs >= 120) {
+          lastSpinMs = now;
+          spinnerIdx = (spinnerIdx + 1) % spinners.length;
+          dotCount++;
+          if (dotCount % 16 === 0) phaseIdx = (phaseIdx + 1) % statusPhases.length;
+          term.write(`\r${dim}${spinners[spinnerIdx]} ${statusPhases[phaseIdx]}${reset}\x1b[K`);
+        }
+        typingInterval = requestAnimationFrame(spinFrame);
+      };
+      typingInterval = requestAnimationFrame(spinFrame);
 
       // ── Stream AI response into chat state ───────────────────────────────
       const toolPermissions = editModeEnabled
@@ -1059,7 +1064,7 @@ No project is loaded. Tell the user to open a project folder so you can see thei
         signal: requestAbortController.signal,
         onStream: (chunk: string) => {
           if (isFirstChunk) {
-            if (typingInterval) clearInterval(typingInterval);
+            if (typingInterval) cancelAnimationFrame(typingInterval!);
             term.write(`\r\x1b[K`); // wipe the spinner line
             isFirstChunk = false;
           }
@@ -1075,7 +1080,7 @@ No project is loaded. Tell the user to open a project folder so you can see thei
 
       // Clear spinner if no streaming happened
       if (isFirstChunk) {
-        if (typingInterval) clearInterval(typingInterval);
+        if (typingInterval) cancelAnimationFrame(typingInterval!);
         term.write(`\r\x1b[K`);
       }
       // Flush any pending batched streaming update
@@ -1163,7 +1168,7 @@ No project is loaded. Tell the user to open a project folder so you can see thei
         return 'Failed to get AI response';
       })();
       if (typingInterval) {
-        clearInterval(typingInterval);
+        cancelAnimationFrame(typingInterval!);
         term.write(`\r\x1b[K`);
       }
 
@@ -1410,7 +1415,7 @@ No project is loaded. Tell the user to open a project folder so you can see thei
     if (enabled) {
       setBlockedEditPrompt(null);
     }
-    // Reset opencode session so permission rules from previous mode don't linger.
+    // Reset AI session so permission rules from previous mode don't linger.
     aiService.setProvider(currentAIConfig.provider, currentAIConfig.model);
     termRef.current?.writeln(
       enabled
@@ -1465,17 +1470,22 @@ No project is loaded. Tell the user to open a project folder so you can see thei
   }, [blockedEditPrompt, isAIProcessing, setEditMode, handleAIInTerminal]);
 
   // Terminal / git summary chips
-  const modifiedCount = gitChanges.filter(change => change.type === 'M').length;
-  const addedCount = gitChanges.filter(change => change.type === 'A').length;
-  const deletedCount = gitChanges.filter(change => change.type === 'D').length;
-  const untrackedCount = gitChanges.filter(change => change.type === '?').length;
-  const totalChanges = gitChanges.length;
-  const gitDetailParts = [
-    modifiedCount > 0 ? `${modifiedCount} modified` : '',
-    addedCount > 0 ? `${addedCount} added` : '',
-    deletedCount > 0 ? `${deletedCount} deleted` : '',
-    untrackedCount > 0 ? `${untrackedCount} untracked` : '',
-  ].filter(Boolean);
+  const { modifiedCount, addedCount, deletedCount, untrackedCount, totalChanges, gitDetailParts } = useMemo(() => {
+    let m = 0, a = 0, d = 0, u = 0;
+    for (const change of gitChanges) {
+      if (change.type === 'M') m++;
+      else if (change.type === 'A') a++;
+      else if (change.type === 'D') d++;
+      else if (change.type === '?') u++;
+    }
+    const parts = [
+      m > 0 ? `${m} modified` : '',
+      a > 0 ? `${a} added` : '',
+      d > 0 ? `${d} deleted` : '',
+      u > 0 ? `${u} untracked` : '',
+    ].filter(Boolean);
+    return { modifiedCount: m, addedCount: a, deletedCount: d, untrackedCount: u, totalChanges: gitChanges.length, gitDetailParts: parts };
+  }, [gitChanges]);
   const approvalAdded = (pendingEditApproval ?? []).reduce((sum, diff) => sum + diff.addedCount, 0);
   const approvalRemoved = (pendingEditApproval ?? []).reduce((sum, diff) => sum + diff.removedCount, 0);
   const terminalSummary = totalChanges > 0
