@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { open, invoke } from "./platform/native";
 import "./App.css";
 import { Settings, AIConfig, AI_PROVIDERS, AIProvider } from "./components/Settings";
+import { SetupScreen } from "./components/SetupScreen";
 import { TerminalBlock, TerminalRef } from "./components/TerminalBlock";
 import { SearchPanel } from "./components/SearchPanel";
 import { GitPanel } from "./components/GitPanel";
@@ -11,19 +12,58 @@ import { aiService } from "./services/ai";
 import { workspaceService, WorkspaceContext } from "./services/workspace";
 
 type Theme = "light" | "dark";
+type SetupTransitionPhase = "idle" | "closing" | "loading" | "finishing";
 
-interface TerminalTab {
+interface TerminalPaneState {
   id: string;
   title: string;
 }
 
+interface WorkspaceTabState {
+  id: string;
+  title: string;
+  panes: TerminalPaneState[];
+  activePaneId: string;
+  shellCwd: string;
+  projectDir: string;
+  projectFileContents: Record<string, string>;
+  workspaceContext: WorkspaceContext | null;
+  gitChanges: Array<{ path: string; type: "M" | "A" | "D" | "?" }>;
+  currentBranch: string;
+}
+
+const makeId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const buildPaneTitle = (index: number) => `Pane ${index}`;
+const MAX_PANES_PER_TAB = 8;
+const PANE_DRAG_DATA_KEY = "application/x-velix-pane";
+const getPaneGridColumnCount = (paneCount: number) => (paneCount <= 1 ? 1 : paneCount <= 4 ? 2 : 3);
+
+const renumberPanes = (panes: TerminalPaneState[]) =>
+  panes.map((pane, index) => ({
+    ...pane,
+    title: buildPaneTitle(index + 1),
+  }));
+
+const getPathLeaf = (value: string) => {
+  const parts = value.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] || value;
+};
+
 function App() {
   const [showSettings, setShowSettings] = useState(false);
+  const [showSetupScreen, setShowSetupScreen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const hasSeenSetup = localStorage.getItem("velix-setup-seen") === "true";
+    if (!hasSeenSetup) {
+      localStorage.setItem("velix-setup-seen", "true");
+      return true;
+    }
+    return false;
+  });
+  const [setupScreenPhase, setSetupScreenPhase] = useState<SetupTransitionPhase>("idle");
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
-  const [shellCwd, setShellCwd] = useState<string>("~");
-  const [currentDir, setCurrentDir] = useState<string>("");
-  const [projectFileContents, setProjectFileContents] = useState<Record<string, string>>({});
-  const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContext | null>(null);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
@@ -32,9 +72,7 @@ function App() {
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const voiceSetupRef = useRef<HTMLDivElement>(null);
   const [_isAIProcessing, setIsAIProcessing] = useState(false);
-
-  const [gitChanges, setGitChanges] = useState<Array<{ path: string; type: "M" | "A" | "D" | "?" }>>([]);
-  const [currentBranch, setCurrentBranch] = useState("");
+  const setupTransitionTimersRef = useRef<number[]>([]);
 
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
@@ -50,21 +88,55 @@ function App() {
     localStorage.setItem("velix-theme", newTheme);
   }, []);
 
+  const clearSetupTransitionTimers = useCallback(() => {
+    setupTransitionTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    setupTransitionTimersRef.current = [];
+  }, []);
+
   const terminalRefs = useRef<Map<string, TerminalRef>>(new Map());
-
-  const [terminalTabs, setTerminalTabs] = useState<TerminalTab[]>([
-    { id: "terminal-1", title: "Terminal 1" },
+  const initialWorkspaceTabIdRef = useRef(makeId("tab"));
+  const initialPaneIdRef = useRef(makeId("pane"));
+  const [defaultShellCwd, setDefaultShellCwd] = useState<string>("~");
+  const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTabState[]>(() => [
+    {
+      id: initialWorkspaceTabIdRef.current,
+      title: "Tab 1",
+      panes: [{ id: initialPaneIdRef.current, title: buildPaneTitle(1) }],
+      activePaneId: initialPaneIdRef.current,
+      shellCwd: "~",
+      projectDir: "",
+      projectFileContents: {},
+      workspaceContext: null,
+      gitChanges: [],
+      currentBranch: "",
+    },
   ]);
-  const [activeTerminalId, setActiveTerminalId] = useState("terminal-1");
-  const [splitWidths, setSplitWidths] = useState<number[]>([100]);
+  const [activeTerminalId, setActiveTerminalId] = useState(initialWorkspaceTabIdRef.current);
+  const [lastWorkspaceTabId, setLastWorkspaceTabId] = useState(initialWorkspaceTabIdRef.current);
+  const [draggingPaneId, setDraggingPaneId] = useState<string | null>(null);
+  const [paneDropPreview, setPaneDropPreview] = useState<{ tabId: string; index: number } | null>(null);
 
-  useEffect(() => {
-    setSplitWidths(terminalTabs.map(() => 100 / terminalTabs.length));
-  }, [terminalTabs.length]);
+  const activeWorkspaceTabId = workspaceTabs.some((tab) =>
+    tab.id === (activeTerminalId === "swarm" ? lastWorkspaceTabId : activeTerminalId),
+  )
+    ? (activeTerminalId === "swarm" ? lastWorkspaceTabId : activeTerminalId)
+    : (workspaceTabs[0]?.id || "");
+  const activeWorkspaceTab =
+    workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId) || workspaceTabs[0] || null;
+  const currentDir = activeWorkspaceTab?.projectDir || "";
+  const workspaceContext = activeWorkspaceTab?.workspaceContext || null;
+  const currentBranch = activeWorkspaceTab?.currentBranch || "";
+
+  const updateWorkspaceTab = useCallback((tabId: string, updater: (tab: WorkspaceTabState) => WorkspaceTabState) => {
+    setWorkspaceTabs((prev) =>
+      prev.map((tab) => (tab.id === tabId ? updater(tab) : tab)),
+    );
+  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem("velix-theme")) return;
       setTheme(e.matches ? "dark" : "light");
     };
 
@@ -72,35 +144,263 @@ function App() {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  const addTerminalTab = useCallback(() => {
-    const newId = `terminal-${Date.now()}`;
-    const newTabNumber = terminalTabs.length + 1;
-    setTerminalTabs((prev) => [...prev, { id: newId, title: `Terminal ${newTabNumber}` }]);
-    setActiveTerminalId(newId);
-  }, [terminalTabs.length]);
+  useEffect(() => () => clearSetupTransitionTimers(), [clearSetupTransitionTimers]);
+
+  useEffect(() => {
+    if (activeTerminalId !== "swarm") {
+      setLastWorkspaceTabId(activeTerminalId);
+    }
+  }, [activeTerminalId]);
+
+  const addWorkspaceTab = useCallback(() => {
+    const newTabId = makeId("tab");
+    const newPaneId = makeId("pane");
+    const nextTabNumber = workspaceTabs.length + 1;
+
+    setWorkspaceTabs((prev) => [
+      ...prev,
+      {
+        id: newTabId,
+        title: `Tab ${nextTabNumber}`,
+        panes: [{ id: newPaneId, title: buildPaneTitle(1) }],
+        activePaneId: newPaneId,
+        shellCwd: defaultShellCwd,
+        projectDir: "",
+        projectFileContents: {},
+        workspaceContext: null,
+        gitChanges: [],
+        currentBranch: "",
+      },
+    ]);
+
+    setActiveTerminalId(newTabId);
+    setLastWorkspaceTabId(newTabId);
+  }, [defaultShellCwd, workspaceTabs.length]);
+
+  const addSplitPane = useCallback((targetTabId?: string) => {
+    const tabId = targetTabId || activeWorkspaceTabId;
+    if (!tabId) return;
+
+    const newPaneId = makeId("pane");
+    updateWorkspaceTab(tabId, (tab) => {
+      if (tab.panes.length >= MAX_PANES_PER_TAB) {
+        return tab;
+      }
+
+      const nextPanes = [
+        ...tab.panes,
+        { id: newPaneId, title: buildPaneTitle(tab.panes.length + 1) },
+      ];
+
+      return {
+        ...tab,
+        panes: renumberPanes(nextPanes),
+        activePaneId: newPaneId,
+      };
+    });
+
+    setActiveTerminalId(tabId);
+    setLastWorkspaceTabId(tabId);
+  }, [activeWorkspaceTabId, updateWorkspaceTab]);
 
   const closeSwarmTab = useCallback(() => {
     setSwarmTabOpen(false);
-    setActiveTerminalId((prev) => prev === 'swarm' ? terminalTabs[0]?.id || 'terminal-1' : prev);
-  }, [terminalTabs]);
+    setActiveTerminalId((prev) =>
+      prev === "swarm" ? (workspaceTabs.some((tab) => tab.id === lastWorkspaceTabId) ? lastWorkspaceTabId : (workspaceTabs[0]?.id || "")) : prev,
+    );
+  }, [lastWorkspaceTabId, workspaceTabs]);
 
-  const closeTerminalTab = useCallback((tabId: string, e?: React.MouseEvent) => {
+  const closeSplitPane = useCallback((tabId: string, paneId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (terminalTabs.length === 1) return;
 
-    const tabIndex = terminalTabs.findIndex((tab) => tab.id === tabId);
-    setTerminalTabs((prev) => prev.filter((tab) => tab.id !== tabId));
+    updateWorkspaceTab(tabId, (tab) => {
+      if (tab.panes.length === 1) return tab;
+
+      const paneIndex = tab.panes.findIndex((pane) => pane.id === paneId);
+      const nextPanes = tab.panes.filter((pane) => pane.id !== paneId);
+      const fallbackPane =
+        nextPanes[Math.max(0, paneIndex - 1)] ||
+        nextPanes[0];
+
+      return {
+        ...tab,
+        panes: renumberPanes(nextPanes),
+        activePaneId:
+          tab.activePaneId === paneId || !nextPanes.some((pane) => pane.id === tab.activePaneId)
+            ? fallbackPane.id
+            : tab.activePaneId,
+      };
+    });
+  }, [updateWorkspaceTab]);
+
+  const movePaneWithinTab = useCallback((tabId: string, sourcePaneId: string, targetIndex: number) => {
+    updateWorkspaceTab(tabId, (tab) => {
+      const sourceIndex = tab.panes.findIndex((pane) => pane.id === sourcePaneId);
+      if (sourceIndex === -1) return tab;
+
+      const nextPanes = [...tab.panes];
+      const [movedPane] = nextPanes.splice(sourceIndex, 1);
+      if (!movedPane) return tab;
+
+      let nextIndex = Math.max(0, Math.min(targetIndex, tab.panes.length));
+      if (sourceIndex < nextIndex) {
+        nextIndex -= 1;
+      }
+      nextIndex = Math.max(0, Math.min(nextIndex, nextPanes.length));
+
+      nextPanes.splice(nextIndex, 0, movedPane);
+
+      return {
+        ...tab,
+        panes: renumberPanes(nextPanes),
+        activePaneId: movedPane.id,
+      };
+    });
+  }, [updateWorkspaceTab]);
+
+  const readDraggedPane = useCallback((event: React.DragEvent): { tabId: string; paneId: string } | null => {
+    const raw = event.dataTransfer.getData(PANE_DRAG_DATA_KEY) || event.dataTransfer.getData("text/plain");
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw) as { tabId?: string; paneId?: string };
+      return parsed.tabId && parsed.paneId
+        ? { tabId: parsed.tabId, paneId: parsed.paneId }
+        : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handlePaneDragStart = useCallback((tabId: string, paneId: string, event: React.DragEvent<HTMLDivElement>) => {
+    const payload = JSON.stringify({ tabId, paneId });
+    event.dataTransfer.setData(PANE_DRAG_DATA_KEY, payload);
+    event.dataTransfer.setData("text/plain", payload);
+    event.dataTransfer.effectAllowed = "move";
+    setDraggingPaneId(paneId);
+    setPaneDropPreview(null);
+    setActiveTerminalId(tabId);
+  }, []);
+
+  const handlePaneDragEnd = useCallback(() => {
+    setDraggingPaneId(null);
+    setPaneDropPreview(null);
+  }, []);
+
+  const getPaneDropIndex = useCallback((
+    event: React.DragEvent<HTMLDivElement>,
+    tab: WorkspaceTabState,
+    targetPaneId: string,
+  ) => {
+    const targetIndex = tab.panes.findIndex((pane) => pane.id === targetPaneId);
+    if (targetIndex === -1) {
+      return tab.panes.length;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const relativeX = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0.5;
+    const relativeY = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0.5;
+    const columns = getPaneGridColumnCount(tab.panes.length);
+
+    if (relativeY <= 0.28) {
+      return Math.max(0, targetIndex - columns);
+    }
+
+    if (relativeY >= 0.72) {
+      return Math.min(tab.panes.length, targetIndex + columns);
+    }
+
+    return relativeX >= 0.5 ? targetIndex + 1 : targetIndex;
+  }, []);
+
+  const handlePanePanelDragOver = useCallback((event: React.DragEvent, tab: WorkspaceTabState) => {
+    const dragged = readDraggedPane(event);
+    if (!dragged || dragged.tabId !== tab.id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setPaneDropPreview((current) =>
+      current?.tabId === tab.id && current.index === tab.panes.length
+        ? current
+        : { tabId: tab.id, index: tab.panes.length },
+    );
+  }, [readDraggedPane]);
+
+  const handlePaneTargetDragOver = useCallback((
+    event: React.DragEvent<HTMLDivElement>,
+    tab: WorkspaceTabState,
+    targetPaneId: string,
+  ) => {
+    const dragged = readDraggedPane(event);
+    if (!dragged || dragged.tabId !== tab.id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const nextIndex = getPaneDropIndex(event, tab, targetPaneId);
+    setPaneDropPreview((current) =>
+      current?.tabId === tab.id && current.index === nextIndex
+        ? current
+        : { tabId: tab.id, index: nextIndex },
+    );
+  }, [getPaneDropIndex, readDraggedPane]);
+
+  const handlePaneDrop = useCallback((event: React.DragEvent, tab: WorkspaceTabState) => {
+    const dragged = readDraggedPane(event);
+    if (!dragged || dragged.tabId !== tab.id) return;
+    event.preventDefault();
+    const targetIndex = paneDropPreview?.tabId === tab.id ? paneDropPreview.index : tab.panes.length;
+    movePaneWithinTab(tab.id, dragged.paneId, targetIndex);
+    setDraggingPaneId(null);
+    setPaneDropPreview(null);
+  }, [movePaneWithinTab, paneDropPreview, readDraggedPane]);
+
+  const closeWorkspaceTab = useCallback((tabId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (workspaceTabs.length === 1) return;
+
+    const tabIndex = workspaceTabs.findIndex((tab) => tab.id === tabId);
+    const remainingTabs = workspaceTabs.filter((tab) => tab.id !== tabId);
+    const fallbackTab =
+      remainingTabs[Math.max(0, tabIndex - 1)] ||
+      remainingTabs[0] ||
+      null;
+
+    setWorkspaceTabs(remainingTabs);
 
     if (activeTerminalId === tabId) {
-      const remaining = terminalTabs.filter((tab) => tab.id !== tabId);
-      const newIndex = tabIndex > 0 ? tabIndex - 1 : 0;
-      setActiveTerminalId(remaining[newIndex]?.id || remaining[0]?.id);
+      setActiveTerminalId(fallbackTab?.id || "");
     }
-  }, [terminalTabs, activeTerminalId]);
+    if (lastWorkspaceTabId === tabId) {
+      setLastWorkspaceTabId(fallbackTab?.id || "");
+    }
+  }, [activeTerminalId, lastWorkspaceTabId, workspaceTabs]);
+
+  const closeActivePaneOrTab = useCallback(() => {
+    if (activeTerminalId === "swarm") {
+      closeSwarmTab();
+      return;
+    }
+
+    if (!activeWorkspaceTab) return;
+
+    if (activeWorkspaceTab.panes.length > 1) {
+      closeSplitPane(activeWorkspaceTab.id, activeWorkspaceTab.activePaneId);
+      return;
+    }
+
+    closeWorkspaceTab(activeWorkspaceTab.id);
+  }, [activeTerminalId, activeWorkspaceTab, closeSplitPane, closeSwarmTab, closeWorkspaceTab]);
 
   useEffect(() => {
     invoke<string>("get_shell_cwd")
-      .then((cwd) => setShellCwd(cwd))
+      .then((cwd) => {
+        setDefaultShellCwd(cwd);
+        setWorkspaceTabs((prev) =>
+          prev.map((tab) =>
+            tab.projectDir || tab.shellCwd !== "~"
+              ? tab
+              : { ...tab, shellCwd: cwd },
+          ),
+        );
+      })
       .catch(() => {});
 
     const initializeAI = async () => {
@@ -138,65 +438,36 @@ function App() {
     };
 
     initializeAI();
+  }, []);
 
+  useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        addTerminalTab();
+        addSplitPane();
       }
 
-      if ((e.metaKey || e.ctrlKey) && e.key === "w" && terminalTabs.length > 1) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "w") {
         e.preventDefault();
-        closeTerminalTab(activeTerminalId);
+        closeActivePaneOrTab();
       }
     };
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [addTerminalTab, closeTerminalTab, terminalTabs.length, activeTerminalId]);
+  }, [addSplitPane, closeActivePaneOrTab]);
 
-  const handleSplitResizeStart = useCallback((e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const startX = e.clientX;
-    const startWidths = [...splitWidths];
-    const containerWidth =
-      (e.target as HTMLElement).closest(".terminal-body")?.clientWidth || window.innerWidth;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - startX;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newLeft = startWidths[index] + deltaPercent;
-      const newRight = startWidths[index + 1] - deltaPercent;
-      const minPanelWidth = 10;
-
-      if (newLeft >= minPanelWidth && newRight >= minPanelWidth) {
-        setSplitWidths((prev) => {
-          const next = [...prev];
-          next[index] = newLeft;
-          next[index + 1] = newRight;
-          return next;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  }, [splitWidths]);
+  const getActivePaneRefs = useCallback(() => (
+    activeWorkspaceTab?.panes
+      .map((pane) => terminalRefs.current.get(pane.id))
+      .filter((terminal): terminal is TerminalRef => Boolean(terminal)) || []
+  ), [activeWorkspaceTab]);
 
   const handleAIRequest = useCallback(async (prompt: string) => {
+    const targetTerminals = getActivePaneRefs();
+
     if (!aiConfig?.apiKey) {
-      terminalRefs.current.forEach((terminal) => {
+      targetTerminals.forEach((terminal) => {
         terminal.write("\x1b[31mAI not configured. Please add an API key in Settings.\x1b[0m\r\n");
       });
       return;
@@ -210,8 +481,16 @@ function App() {
       if (currentDir) {
         try {
           const wsContext = workspaceContext || await workspaceService.scan(currentDir);
-          if (!workspaceContext) {
-            setWorkspaceContext(wsContext);
+          if (!workspaceContext && activeWorkspaceTab) {
+            updateWorkspaceTab(activeWorkspaceTab.id, (tab) =>
+              tab.projectDir !== currentDir
+                ? tab
+                : {
+                    ...tab,
+                    workspaceContext: wsContext,
+                    projectFileContents: wsContext.loadedFiles,
+                  },
+            );
           }
 
           contextMessage = workspaceService.buildContextPrompt(wsContext);
@@ -270,7 +549,7 @@ Working directory: ${currentDir || "unknown"}`;
         { role: "user" as const, content: prompt },
       ];
 
-      terminalRefs.current.forEach((terminal) => {
+      targetTerminals.forEach((terminal) => {
         terminal.write("\x1b[36mAI is thinking...\x1b[0m\r\n");
       });
 
@@ -296,12 +575,12 @@ Working directory: ${currentDir || "unknown"}`;
               command: `cat > "${fullPath}" << 'VELIX_EOF'\n${fileContent}\nVELIX_EOF`,
               cwd: currentDir,
             });
-            terminalRefs.current.forEach((terminal) => {
+            targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[32m✓ File modified: ${fullPath}\x1b[0m\r\n`);
             });
           } catch (error) {
             console.error("File write error:", error);
-            terminalRefs.current.forEach((terminal) => {
+            targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[31m✗ Failed to write: ${fullPath}: ${error}\x1b[0m\r\n`);
             });
           }
@@ -326,12 +605,12 @@ Working directory: ${currentDir || "unknown"}`;
               command: `mkdir -p "${parentDir}" && cat > "${fullPath}" << 'VELIX_EOF'\n${fileContent}\nVELIX_EOF`,
               cwd: currentDir,
             });
-            terminalRefs.current.forEach((terminal) => {
+            targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[32m✓ File created: ${fullPath}\x1b[0m\r\n`);
             });
           } catch (error) {
             console.error("File create error:", error);
-            terminalRefs.current.forEach((terminal) => {
+            targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[31m✗ Failed to create: ${fullPath}: ${error}\x1b[0m\r\n`);
             });
           }
@@ -354,54 +633,20 @@ Working directory: ${currentDir || "unknown"}`;
         .replace(/^\s*\d+\.\s+/gm, "")
         .trim();
 
-      terminalRefs.current.forEach((terminal) => {
+      targetTerminals.forEach((terminal) => {
         terminal.write("\r\x1b[2K\r");
         terminal.write("\x1b[32mAI:\x1b[0m ");
         terminal.write(displayText + "\r\n");
       });
     } catch (error) {
       console.error("AI request failed:", error);
-      terminalRefs.current.forEach((terminal) => {
+      targetTerminals.forEach((terminal) => {
         terminal.write(`\x1b[31mAI Error: ${error instanceof Error ? error.message : "Unknown error"}\x1b[0m\r\n`);
       });
     } finally {
       setIsAIProcessing(false);
     }
-  }, [aiConfig, currentDir, workspaceContext]);
-
-  useEffect(() => {
-    const loadGitChanges = async () => {
-      if (!currentDir) {
-        setGitChanges([]);
-        setCurrentBranch("");
-        return;
-      }
-
-      try {
-        const status = await invoke<{ branch?: string; files: Array<{ path: string; status: string }> }>("get_git_status", {
-          repoPath: currentDir,
-        });
-
-        const changes = status.files.map((file) => ({
-          path: file.path,
-          type: file.status.includes("M") ? "M" as const
-            : file.status.includes("A") ? "A" as const
-            : file.status.includes("D") ? "D" as const
-            : "?" as const,
-        }));
-
-        setGitChanges(changes);
-        setCurrentBranch(status.branch || "");
-      } catch {
-        setGitChanges([]);
-        setCurrentBranch("");
-      }
-    };
-
-    loadGitChanges();
-    const interval = setInterval(loadGitChanges, 5000);
-    return () => clearInterval(interval);
-  }, [currentDir]);
+  }, [activeWorkspaceTab, aiConfig, currentDir, getActivePaneRefs, updateWorkspaceTab, workspaceContext]);
 
   useEffect(() => {
     if (!showVoiceSetup) return;
@@ -417,50 +662,145 @@ Working directory: ${currentDir || "unknown"}`;
   }, [showVoiceSetup]);
 
   const loadProjectFiles = useCallback(async (directory: string) => {
-    if (!directory || directory === "~") return;
+    if (!directory || directory === "~") {
+      return {
+        workspaceContext: null,
+        projectFileContents: {} as Record<string, string>,
+      };
+    }
 
     try {
-      const wsContext = await workspaceService.scan(directory);
-      setWorkspaceContext(wsContext);
-      setProjectFileContents(wsContext.loadedFiles);
+      const nextWorkspaceContext = await workspaceService.scan(directory);
+      return {
+        workspaceContext: nextWorkspaceContext,
+        projectFileContents: nextWorkspaceContext.loadedFiles,
+      };
     } catch (error) {
       console.error("WorkspaceService scan failed, using fallback:", error);
-      setWorkspaceContext(null);
 
       try {
         const projectFilesMap = await invoke<Record<string, string>>("read_project_source_files", {
           directory,
         });
-        setProjectFileContents(projectFilesMap || {});
+        return {
+          workspaceContext: null,
+          projectFileContents: projectFilesMap || {},
+        };
       } catch (fallbackError) {
         console.error("Fallback loading also failed:", fallbackError);
-        setProjectFileContents({});
+        return {
+          workspaceContext: null,
+          projectFileContents: {} as Record<string, string>,
+        };
       }
     }
   }, []);
 
-  useEffect(() => {
-    if (currentDir && currentDir !== "~") {
-      loadProjectFiles(currentDir);
+  const refreshGitStatus = useCallback(async (tabId: string, directory: string) => {
+    if (!directory) {
+      updateWorkspaceTab(tabId, (tab) => ({
+        ...tab,
+        gitChanges: [],
+        currentBranch: "",
+      }));
+      return;
     }
-  }, [currentDir, loadProjectFiles]);
+
+    try {
+      const status = await invoke<{ branch?: string; files: Array<{ path: string; status: string }> }>("get_git_status", {
+        repoPath: directory,
+      });
+
+      const changes = status.files.map((file) => ({
+        path: file.path,
+        type: file.status.includes("M") ? "M" as const
+          : file.status.includes("A") ? "A" as const
+          : file.status.includes("D") ? "D" as const
+          : "?" as const,
+      }));
+
+      updateWorkspaceTab(tabId, (tab) =>
+        tab.projectDir !== directory
+          ? tab
+          : {
+              ...tab,
+              gitChanges: changes,
+              currentBranch: status.branch || "",
+            },
+      );
+    } catch {
+      updateWorkspaceTab(tabId, (tab) => ({
+        ...tab,
+        gitChanges: [],
+        currentBranch: "",
+      }));
+    }
+  }, [updateWorkspaceTab]);
+
+  useEffect(() => {
+    if (!activeWorkspaceTab || !currentDir || currentDir === "~") return;
+    if (activeWorkspaceTab.workspaceContext || Object.keys(activeWorkspaceTab.projectFileContents).length > 0) return;
+
+    let cancelled = false;
+
+    loadProjectFiles(currentDir).then((nextState) => {
+      if (cancelled) return;
+      updateWorkspaceTab(activeWorkspaceTab.id, (tab) =>
+        tab.projectDir !== currentDir
+          ? tab
+          : {
+              ...tab,
+              workspaceContext: nextState.workspaceContext,
+              projectFileContents: nextState.projectFileContents,
+            },
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspaceTab, currentDir, loadProjectFiles, updateWorkspaceTab]);
+
+  useEffect(() => {
+    if (!activeWorkspaceTab) return;
+
+    void refreshGitStatus(activeWorkspaceTab.id, currentDir);
+    const interval = setInterval(() => {
+      void refreshGitStatus(activeWorkspaceTab.id, currentDir);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeWorkspaceTab, currentDir, refreshGitStatus]);
 
   const handleOpenProject = useCallback(async () => {
+    if (!activeWorkspaceTab) return;
+
     try {
       const selected = await open({ directory: true, multiple: false });
       if (selected && typeof selected === "string") {
-        setCurrentDir(selected);
         try {
           await invoke("set_shell_cwd", { cwd: selected });
-          setShellCwd(selected);
         } catch {}
 
-        await loadProjectFiles(selected);
+        const nextState = await loadProjectFiles(selected);
+
+        updateWorkspaceTab(activeWorkspaceTab.id, (tab) => ({
+          ...tab,
+          title: getPathLeaf(selected),
+          shellCwd: selected,
+          projectDir: selected,
+          workspaceContext: nextState.workspaceContext,
+          projectFileContents: nextState.projectFileContents,
+          gitChanges: [],
+          currentBranch: "",
+        }));
+
+        await refreshGitStatus(activeWorkspaceTab.id, selected);
       }
     } catch (error) {
       console.error("Failed to open project:", error);
     }
-  }, [loadProjectFiles]);
+  }, [activeWorkspaceTab, loadProjectFiles, refreshGitStatus, updateWorkspaceTab]);
 
   const handleAIConfigSave = useCallback(async (config: AIConfig) => {
     setAiConfig(config);
@@ -474,11 +814,53 @@ Working directory: ${currentDir || "unknown"}`;
     }
   }, []);
 
+  const runSetupExitSequence = useCallback((onComplete?: () => void) => {
+    if (!showSetupScreen || setupScreenPhase !== "idle") return;
+
+    clearSetupTransitionTimers();
+    setSetupScreenPhase("closing");
+
+    setupTransitionTimersRef.current = [
+      window.setTimeout(() => {
+        setSetupScreenPhase("loading");
+      }, 280),
+      window.setTimeout(() => {
+        setSetupScreenPhase("finishing");
+      }, 1680),
+      window.setTimeout(() => {
+        setShowSetupScreen(false);
+        setSetupScreenPhase("idle");
+        clearSetupTransitionTimers();
+        onComplete?.();
+      }, 1960),
+    ];
+  }, [clearSetupTransitionTimers, setupScreenPhase, showSetupScreen]);
+
+  const dismissSetupScreen = useCallback(() => {
+    runSetupExitSequence();
+  }, [runSetupExitSequence]);
+
+  const openAdvancedSettings = useCallback(() => {
+    runSetupExitSequence(() => {
+      setShowSettings(true);
+    });
+  }, [runSetupExitSequence]);
+
   const refreshWorkspaceAfterBranchChange = useCallback(async () => {
-    if (!currentDir) return;
+    if (!activeWorkspaceTab || !currentDir) return;
     workspaceService.invalidateCache();
-    await loadProjectFiles(currentDir);
-  }, [currentDir, loadProjectFiles]);
+    const nextState = await loadProjectFiles(currentDir);
+    updateWorkspaceTab(activeWorkspaceTab.id, (tab) =>
+      tab.projectDir !== currentDir
+        ? tab
+        : {
+            ...tab,
+            workspaceContext: nextState.workspaceContext,
+            projectFileContents: nextState.projectFileContents,
+          },
+    );
+    await refreshGitStatus(activeWorkspaceTab.id, currentDir);
+  }, [activeWorkspaceTab, currentDir, loadProjectFiles, refreshGitStatus, updateWorkspaceTab]);
 
   const togglePanel = (panel: "search" | "git" | "voice" | "swarm" | null) => {
     setShowVoiceSetup(false);
@@ -509,10 +891,22 @@ Working directory: ${currentDir || "unknown"}`;
 
   const canShowVoiceChat = showVoiceChat && !!openaiApiKey;
   const hasRightPanel = showSearchPanel || showGitPanel || canShowVoiceChat;
-  const projectName = currentDir ? currentDir.split("/").pop() || currentDir : "No project open";
+  const projectName = currentDir ? getPathLeaf(currentDir) : "No project open";
+  const activeWorkspaceTitle = activeWorkspaceTab
+    ? (activeWorkspaceTab.projectDir ? getPathLeaf(activeWorkspaceTab.projectDir) : activeWorkspaceTab.title)
+    : "Terminal";
   const activeTerminalTitle = activeTerminalId === 'swarm'
     ? 'Swarm'
-    : terminalTabs.find((tab) => tab.id === activeTerminalId)?.title || 'Terminal';
+    : activeWorkspaceTitle;
+  const getPaneGridStyle = (paneCount: number) => {
+    if (paneCount <= 1) return undefined;
+    const columns = getPaneGridColumnCount(paneCount);
+    const rows = Math.ceil(paneCount / columns);
+    return {
+      gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+      gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+    };
+  };
 
   return (
     <div className={`app ${theme}`}>
@@ -572,20 +966,20 @@ Working directory: ${currentDir || "unknown"}`;
                   </button>
                 </div>
                 <p className="voice-setup-desc">
-                  Voice Chat requires an OpenAI API key. Here&apos;s how to get started:
+                  Voice Chat requires a ChatGPT API key. Configure it in Settings:
                 </p>
                 <ol className="voice-setup-steps">
                   <li>
                     <span className="voice-setup-step-num">1</span>
-                    <span>Open <strong>Settings</strong> below</span>
+                    <span>Open <strong>Settings</strong></span>
                   </li>
                   <li>
                     <span className="voice-setup-step-num">2</span>
-                    <span>Select <strong>ChatGPT</strong> as your AI provider</span>
+                    <span>Add a <strong>ChatGPT</strong> API key</span>
                   </li>
                   <li>
                     <span className="voice-setup-step-num">3</span>
-                    <span>Paste your <strong>OpenAI API key</strong></span>
+                    <span>Come back here and launch <strong>Voice Chat</strong></span>
                   </li>
                 </ol>
                 <button
@@ -662,136 +1056,225 @@ Working directory: ${currentDir || "unknown"}`;
         <div className="terminal-pane">
           <div className="terminal-area">
             <div className="terminal-topbar">
-              <div className="workspace-bar">
-                <button className="workspace-open-btn" onClick={handleOpenProject} title="Open Project">
+              <div className="workspace-strip">
+                <button
+                  className="workspace-open-btn"
+                  onClick={handleOpenProject}
+                  title={currentDir ? "Change Project Folder" : "Open Project Folder"}
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                   </svg>
+                  <span>{currentDir ? "Change Folder" : "Open Folder"}</span>
                 </button>
-                <div className="workspace-summary">
-                  <span className="workspace-name">{projectName}</span>
-                  <span className="workspace-path">
-                    {currentDir || "Choose a folder to load search, git, and workspace context."}
-                  </span>
-                </div>
-              </div>
 
-              <div className="terminal-tabs">
-                {terminalTabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className={`terminal-tab ${tab.id === activeTerminalId ? "active" : ""}`}
-                    onClick={() => setActiveTerminalId(tab.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="terminal-tab-icon">
-                      <polyline points="4 17 10 11 4 5" />
-                      <line x1="12" y1="19" x2="20" y2="19" />
-                    </svg>
-                    <span className="terminal-tab-title">{tab.title}</span>
-                    {terminalTabs.length > 1 && (
-                      <button className="terminal-tab-close" onClick={(e) => closeTerminalTab(tab.id, e)}>
-                        ×
-                      </button>
-                    )}
+                <div className="workspace-bar">
+                  <span className="workspace-label">Workspace</span>
+                  <div className="workspace-summary">
+                    <span className="workspace-name">{projectName}</span>
+                    <span className="workspace-path">
+                      {currentDir || "Choose a folder to load search, git, and workspace context."}
+                    </span>
                   </div>
-                ))}
-                {swarmTabOpen && (
-                  <div
-                    className={`terminal-tab terminal-tab-swarm${activeTerminalId === 'swarm' ? ' active' : ''}`}
-                    onClick={() => setActiveTerminalId('swarm')}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="terminal-tab-icon">
-                      <circle cx="12" cy="5" r="2.5" />
-                      <circle cx="5" cy="19" r="2.5" />
-                      <circle cx="19" cy="19" r="2.5" />
-                      <line x1="12" y1="7.5" x2="12" y2="12" />
-                      <line x1="12" y1="12" x2="5" y2="16.5" />
-                      <line x1="12" y1="12" x2="19" y2="16.5" />
+                </div>
+
+                {currentBranch && (
+                  <div className="workspace-branch-chip" title={`Current branch: ${currentBranch}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="6" y1="3" x2="6" y2="15" />
+                      <circle cx="18" cy="6" r="3" />
+                      <circle cx="6" cy="18" r="3" />
+                      <path d="M18 9a9 9 0 0 1-9 9" />
                     </svg>
-                    <span className="terminal-tab-title">Swarm</span>
-                    <button className="terminal-tab-close" onClick={(e) => { e.stopPropagation(); closeSwarmTab(); }}>×</button>
+                    <span>{currentBranch}</span>
                   </div>
                 )}
-                <button className="terminal-tab-add" onClick={addTerminalTab} title="New Terminal (Cmd+D)">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
+              </div>
+
+              <div className="terminal-tab-row">
+                <div className="terminal-tabs">
+                  {workspaceTabs.map((tab) => {
+                    const tabLabel = tab.projectDir ? getPathLeaf(tab.projectDir) : tab.title;
+                    return (
+                      <div
+                        key={tab.id}
+                        className={`terminal-tab ${tab.id === activeTerminalId ? "active" : ""}`}
+                        onClick={() => setActiveTerminalId(tab.id)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="terminal-tab-icon">
+                          <polyline points="4 17 10 11 4 5" />
+                          <line x1="12" y1="19" x2="20" y2="19" />
+                        </svg>
+                        <span className="terminal-tab-title">{tabLabel}</span>
+                        {workspaceTabs.length > 1 && (
+                          <button className="terminal-tab-close" onClick={(e) => closeWorkspaceTab(tab.id, e)}>
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {swarmTabOpen && (
+                    <div
+                      className={`terminal-tab terminal-tab-swarm${activeTerminalId === 'swarm' ? ' active' : ''}`}
+                      onClick={() => setActiveTerminalId('swarm')}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="terminal-tab-icon">
+                        <circle cx="12" cy="5" r="2.5" />
+                        <circle cx="5" cy="19" r="2.5" />
+                        <circle cx="19" cy="19" r="2.5" />
+                        <line x1="12" y1="7.5" x2="12" y2="12" />
+                        <line x1="12" y1="12" x2="5" y2="16.5" />
+                        <line x1="12" y1="12" x2="19" y2="16.5" />
+                      </svg>
+                      <span className="terminal-tab-title">Swarm</span>
+                      <button className="terminal-tab-close" onClick={(e) => { e.stopPropagation(); closeSwarmTab(); }}>×</button>
+                    </div>
+                  )}
+                  <button className="terminal-tab-add" onClick={addWorkspaceTab} title="New Tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className={`terminal-body ${activeTerminalId !== 'swarm' && terminalTabs.length > 1 ? "split-view" : ""}`}>
-              {activeTerminalId === 'swarm' && swarmTabOpen && (
-                <SwarmPanel
-                  isOpen={true}
-                  onClose={closeSwarmTab}
-                  theme={theme}
-                  workspacePath={currentDir}
-                  hasApiKey={!!aiConfig?.apiKey}
-                />
+            <div className="terminal-body">
+              {swarmTabOpen && (
+                <div
+                  className={`terminal-tab-panel terminal-tab-panel-swarm${activeTerminalId === "swarm" ? " active" : ""}`}
+                  style={{ display: activeTerminalId === "swarm" ? "flex" : "none" }}
+                >
+                  <SwarmPanel
+                    isOpen={true}
+                    onClose={closeSwarmTab}
+                    theme={theme}
+                    workspacePath={currentDir}
+                    hasApiKey={!!aiConfig?.apiKey}
+                  />
+                </div>
               )}
-              {terminalTabs.flatMap((tab, index) => {
-                const isVisible = activeTerminalId !== 'swarm' && (terminalTabs.length > 1 || tab.id === activeTerminalId);
-                const widthStyle = terminalTabs.length > 1 && splitWidths.length === terminalTabs.length
-                  ? { flexBasis: `${splitWidths[index]}%`, flexGrow: 0, flexShrink: 0 }
-                  : {};
 
-                const terminalElement = (
-                  <div
-                    key={tab.id}
-                    className={`terminal-tab-content ${tab.id === activeTerminalId ? "active" : ""}`}
-                    style={{ display: isVisible ? "flex" : "none", ...widthStyle }}
-                    onClick={() => setActiveTerminalId(tab.id)}
-                  >
-                    {terminalTabs.length > 1 && (
-                      <div className="split-terminal-header">
-                        <span>{tab.title}</span>
-                        <button
-                          className="split-terminal-close"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            closeTerminalTab(tab.id, e);
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    )}
-                    <TerminalBlock
-                      ref={(element) => {
-                        if (element) {
-                          terminalRefs.current.set(tab.id, element);
-                        } else {
-                          terminalRefs.current.delete(tab.id);
-                        }
-                      }}
-                      cwd={shellCwd}
-                      onCwdChange={setShellCwd}
-                      theme={theme}
-                      onAIRequest={handleAIRequest}
-                      aiEnabled={!!aiConfig?.apiKey}
-                      gitChanges={gitChanges}
-                      onOpenGitPanel={() => togglePanel("git")}
-                      projectDir={currentDir}
-                      projectFileContents={projectFileContents}
-                      workspaceContext={workspaceContext}
-                    />
-                  </div>
-                );
+              {workspaceTabs.map((tab) => (
+                (() => {
+                  const previewIndex =
+                    paneDropPreview?.tabId === tab.id
+                      ? Math.max(0, Math.min(paneDropPreview.index, tab.panes.length))
+                      : null;
+                  const renderedPaneCount = tab.panes.length + (previewIndex !== null ? 1 : 0);
+                  const panelStyle =
+                    tab.id === activeTerminalId
+                      ? getPaneGridStyle(renderedPaneCount)
+                      : { display: "none" };
+                  const renderItems: Array<
+                    | { type: "pane"; pane: TerminalPaneState }
+                    | { type: "preview"; key: string }
+                  > = tab.panes.map((pane) => ({ type: "pane", pane }));
 
-                const elements = [terminalElement];
-                if (terminalTabs.length > 1 && index < terminalTabs.length - 1) {
-                  elements.push(
+                  if (previewIndex !== null) {
+                    renderItems.splice(previewIndex, 0, {
+                      type: "preview",
+                      key: `${tab.id}-preview-${previewIndex}`,
+                    });
+                  }
+
+                  return (
                     <div
-                      key={`split-handle-${index}`}
-                      className="split-resize-handle"
-                      onMouseDown={(e) => handleSplitResizeStart(e, index)}
-                    />,
+                      key={tab.id}
+                      className={`terminal-tab-panel${tab.panes.length > 1 ? " split-view" : ""}${tab.id === activeTerminalId ? " active" : ""}`}
+                      style={panelStyle}
+                      onDragOver={(e) => handlePanePanelDragOver(e, tab)}
+                      onDrop={(e) => handlePaneDrop(e, tab)}
+                    >
+                      {renderItems.map((item) => {
+                        if (item.type === "preview") {
+                          return (
+                            <div
+                              key={item.key}
+                              className="terminal-pane-drop-preview"
+                              aria-hidden="true"
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handlePaneDrop(e, tab);
+                              }}
+                            />
+                          );
+                        }
+
+                        const pane = item.pane;
+                        const isActivePane = pane.id === tab.activePaneId;
+
+                        return (
+                          <div
+                            key={pane.id}
+                            className={`terminal-tab-content ${isActivePane ? "active" : ""}${draggingPaneId === pane.id ? " dragging" : ""}`}
+                            onClick={() => {
+                              setActiveTerminalId(tab.id);
+                              updateWorkspaceTab(tab.id, (currentTab) => ({
+                                ...currentTab,
+                                activePaneId: pane.id,
+                              }));
+                            }}
+                            onDragOver={(e) => {
+                              e.stopPropagation();
+                              handlePaneTargetDragOver(e, tab, pane.id);
+                            }}
+                            onDrop={(e) => {
+                              e.stopPropagation();
+                              handlePaneDrop(e, tab);
+                            }}
+                          >
+                            {tab.panes.length > 1 && (
+                              <div
+                                className="split-terminal-header draggable"
+                                draggable
+                                onDragStart={(e) => handlePaneDragStart(tab.id, pane.id, e)}
+                                onDragEnd={handlePaneDragEnd}
+                              >
+                                <span className="split-terminal-title">{pane.title}</span>
+                                <div className="split-terminal-actions">
+                                  <span className="split-terminal-drag">⋮⋮</span>
+                                  <button
+                                    className="split-terminal-close"
+                                    onClick={(e) => closeSplitPane(tab.id, pane.id, e)}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            <TerminalBlock
+                              ref={(element) => {
+                                if (element) {
+                                  terminalRefs.current.set(pane.id, element);
+                                } else {
+                                  terminalRefs.current.delete(pane.id);
+                                }
+                              }}
+                              cwd={tab.shellCwd || defaultShellCwd}
+                              theme={theme}
+                              onAIRequest={handleAIRequest}
+                              aiEnabled={!!aiConfig?.apiKey}
+                              gitChanges={tab.gitChanges}
+                              onOpenGitPanel={() => togglePanel("git")}
+                              projectDir={tab.projectDir}
+                              projectFileContents={tab.projectFileContents}
+                              workspaceContext={tab.workspaceContext}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   );
-                }
-                return elements;
-              })}
+                })()
+              ))}
             </div>
           </div>
         </div>
@@ -858,6 +1341,17 @@ Working directory: ${currentDir || "unknown"}`;
         currentConfig={aiConfig}
         theme={theme}
         onThemeChange={handleThemeChange}
+      />
+
+      <SetupScreen
+        isOpen={showSetupScreen}
+        phase={setupScreenPhase}
+        theme={theme}
+        currentConfig={aiConfig}
+        onThemeChange={handleThemeChange}
+        onSave={handleAIConfigSave}
+        onClose={dismissSetupScreen}
+        onOpenAdvancedSettings={openAdvancedSettings}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, net, Notification } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, net, Notification, nativeImage } = require("electron");
 const fs = require("node:fs");
 const fsPromises = require("node:fs/promises");
 const os = require("node:os");
@@ -78,6 +78,7 @@ const READ_PROJECT_MAX_FILE_SIZE = 10_000;
 
 let mainWindow = null;
 let shellCwd = os.homedir();
+const APP_ICON_PATH = path.join(__dirname, "..", "src-tauri", "icons", "icon.png");
 
 /** @type {{ api_keys: Record<string, string> }} */
 let settingsCache = { api_keys: {} };
@@ -1038,11 +1039,16 @@ const loadUrlWithRetry = async (windowRef, url) => {
 };
 
 const createWindow = async () => {
+  if (process.platform === "darwin" && fs.existsSync(APP_ICON_PATH)) {
+    app.dock.setIcon(nativeImage.createFromPath(APP_ICON_PATH));
+  }
+
   const windowRef = new BrowserWindow({
     width: 1500,
     height: 960,
     minWidth: 1100,
     minHeight: 700,
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

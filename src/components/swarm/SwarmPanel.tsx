@@ -9,7 +9,13 @@ import {
 } from '../../services/swarm';
 import { Agent, AgentRoleType, AgentStatus, WorkerCLI } from '../../services/swarm/types';
 import { AgentTerminal } from './AgentTerminal';
-import { SwarmMindMap, MindMapNode } from './SwarmMindMap';
+import {
+  SwarmMindMap,
+  MindMapConnection,
+  MindMapNode,
+  MindMapPosition,
+  buildDefaultMindMapPosition,
+} from './SwarmMindMap';
 import './SwarmPanel.css';
 
 interface SwarmPanelProps {
@@ -71,12 +77,35 @@ const OPERATING_MODEL = [
   'Review gates and escalation keep the swarm from drifting.',
 ];
 const PALETTE_ROLE_COLORS: Record<SwarmLaunchRole, string> = {
-  scout: '#06B6D4',
-  builder: '#8B5CF6',
-  reviewer: '#F59E0B',
+  scout: 'var(--text-muted)',
+  builder: 'var(--text-primary)',
+  reviewer: 'var(--text-secondary)',
 };
 const PALETTE_DRAG_KEY = 'smm-role';
 const FINISHED_STATUSES = new Set<AgentStatus>(['completed', 'failed', 'terminated']);
+const WORK_SUMMARY_FALLBACK: Record<SwarmLaunchRole, string> = {
+  scout: 'Map code paths',
+  builder: 'Ship owned slice',
+  reviewer: 'Review build output',
+};
+const WORK_SUMMARY_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'before',
+  'for',
+  'from',
+  'inside',
+  'its',
+  'of',
+  'on',
+  'or',
+  'the',
+  'this',
+  'to',
+  'with',
+  'your',
+]);
 
 const formatTimestamp = (timestamp: number) =>
   new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -178,6 +207,104 @@ const getAssignmentState = (
   return { label: 'BUILDING', tone: 'building' };
 };
 
+const normalizeMindMapId = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const formatSummaryWord = (value: string): string =>
+  value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+
+const buildWorkSummary = (value: string | undefined, role: SwarmLaunchRole): string => {
+  const tokens = (value || '')
+    .replace(/your assigned task:/gi, ' ')
+    .replace(/[^a-z0-9\s/-]/gi, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .filter((token) => !/^\d+$/.test(token));
+
+  const filtered = tokens.filter((token) => !WORK_SUMMARY_STOP_WORDS.has(token.toLowerCase()));
+  const chosen = (filtered.length >= 3 ? filtered : tokens)
+    .slice(0, 3)
+    .map(formatSummaryWord);
+
+  return chosen.length > 0 ? chosen.join(' ') : WORK_SUMMARY_FALLBACK[role];
+};
+
+const dedupeMindMapConnections = (connections: MindMapConnection[]): MindMapConnection[] => {
+  const uniqueConnections = new Map<string, MindMapConnection>();
+
+  for (const connection of connections) {
+    if (!connection.from || !connection.to || connection.from === connection.to) continue;
+
+    const key = `${connection.from}->${connection.to}`;
+    const existing = uniqueConnections.get(key);
+    if (!existing || connection.kind === 'manual') {
+      uniqueConnections.set(key, connection);
+    }
+  }
+
+  return Array.from(uniqueConnections.values());
+};
+
+const applyManualConnectionsToAssignments = (
+  assignments: SwarmAssignment[],
+  manualConnections: MindMapConnection[],
+): SwarmAssignment[] => {
+  if (manualConnections.length === 0) return assignments;
+
+  const labelById = new Map(assignments.map((assignment) => [assignment.id, assignment.label]));
+  const additionsByTarget = new Map<string, string[]>();
+
+  for (const connection of manualConnections) {
+    const sourceLabel = labelById.get(connection.from);
+    if (!sourceLabel) continue;
+
+    const current = additionsByTarget.get(connection.to) || [];
+    current.push(sourceLabel);
+    additionsByTarget.set(connection.to, current);
+  }
+
+  return assignments.map((assignment) => {
+    const manualDependencies = additionsByTarget.get(assignment.id);
+    if (!manualDependencies || manualDependencies.length === 0) return assignment;
+
+    return {
+      ...assignment,
+      dependencies: Array.from(
+        new Set([
+          ...assignment.dependencies,
+          ...manualDependencies,
+        ]),
+      ).filter((dependency) => normalizeMindMapId(dependency) !== normalizeMindMapId(assignment.label)),
+    };
+  });
+};
+
+const buildAutomaticMindMapConnections = (assignments: SwarmAssignment[]): MindMapConnection[] => {
+  const idsByNormalizedLabel = new Map(
+    assignments.map((assignment) => [normalizeMindMapId(assignment.label), assignment.id]),
+  );
+  const idsByAssignmentId = new Map(
+    assignments.map((assignment) => [normalizeMindMapId(assignment.id), assignment.id]),
+  );
+
+  return dedupeMindMapConnections(
+    assignments.flatMap((assignment) =>
+      assignment.dependencies.flatMap((dependency) => {
+        const normalizedDependency = normalizeMindMapId(dependency);
+        const sourceId = idsByAssignmentId.get(normalizedDependency) || idsByNormalizedLabel.get(normalizedDependency);
+        return sourceId && sourceId !== assignment.id
+          ? [{ from: sourceId, to: assignment.id, kind: 'automatic' as const }]
+          : [];
+      }),
+    ),
+  );
+};
+
 export const SwarmPanel: React.FC<SwarmPanelProps> = ({
   isOpen,
   onClose,
@@ -214,7 +341,10 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
   const [coordinatorLog, setCoordinatorLog] = useState<CoordinatorLogEntry[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [agentChatMsg, setAgentChatMsg] = useState('');
-  const [dragOverMindmap, setDragOverMindmap] = useState(false);
+  const [nodePositions, setNodePositions] = useState<Record<string, MindMapPosition>>({});
+  const [manualConnections, setManualConnections] = useState<MindMapConnection[]>([]);
+  const pendingDroppedNodesRef = useRef<Array<{ role: SwarmLaunchRole; position: MindMapPosition }>>([]);
+  const previousBoardAssignmentIdsRef = useRef<string[]>([]);
 
   const appendLog = useCallback((kind: CoordinatorLogEntry['kind'], message: string) => {
     setCoordinatorLog((prev) =>
@@ -350,6 +480,10 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
 
     const snapshot = manager.getAllAgents();
     if (snapshot.length === 0) return;
+    const syncPlan = {
+      ...coordinatorPlan,
+      assignments: applyManualConnectionsToAssignments(coordinatorPlan.assignments, manualConnections),
+    };
 
     setIsSyncing(true);
     setStatusLabel(reason === 'manual' ? 'Coordinator Syncing' : 'Coordinator Monitoring');
@@ -364,7 +498,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
       const syncResult = await claudeCoordinator.createSyncResult(
         activeGoal,
         workspacePath,
-        coordinatorPlan,
+        syncPlan,
         snapshot,
       );
 
@@ -395,7 +529,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     } finally {
       setIsSyncing(false);
     }
-  }, [activeGoal, appendLog, coordinatorPlan, isSyncing, refreshAgents, workspacePath]);
+  }, [activeGoal, appendLog, coordinatorPlan, isSyncing, manualConnections, refreshAgents, workspacePath]);
 
   useEffect(() => {
     stopAutoSync();
@@ -415,7 +549,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     return stopAutoSync;
   }, [activeGoal, coordinatorPlan, handleCoordinatorSync, isLaunching, isSyncing, stopAutoSync]);
 
-  const adjustRoleCount = (role: SwarmLaunchRole, delta: number) => {
+  const adjustRoleCount = useCallback((role: SwarmLaunchRole, delta: number) => {
     setRoleCounts((prev) => {
       const limits = ROLE_LIMITS[role];
       const nextValue = Math.max(limits.min, Math.min(limits.max, prev[role] + delta));
@@ -429,7 +563,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
 
       return proposed;
     });
-  };
+  }, []);
 
   const handleLaunch = useCallback(async () => {
     const manager = managerRef.current;
@@ -474,7 +608,11 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
 
       manager.setWorkerCLI(workerCLI);
 
-      const plan = await claudeCoordinator.createLaunchPlan(trimmedGoal, workspacePath, rolesToLaunch);
+      const rawPlan = await claudeCoordinator.createLaunchPlan(trimmedGoal, workspacePath, rolesToLaunch);
+      const plan = {
+        ...rawPlan,
+        assignments: applyManualConnectionsToAssignments(rawPlan.assignments, manualConnections),
+      };
       setCoordinatorPlan(plan);
       appendLog('plan', plan.summary);
       setStatusLabel('Launching Workers');
@@ -510,6 +648,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     workerCLI,
     workerCLIAvailability,
     workspacePath,
+    manualConnections,
   ]);
 
   const handleKill = useCallback(async (agentId: string) => {
@@ -529,6 +668,8 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     setCoordinatorPlan(null);
     setLastSync(null);
     setStatusLabel('Idle');
+    setSelectedAgentId(null);
+    setAgentChatMsg('');
     appendLog('dispatch', 'Terminated all swarm agents.');
   }, [appendLog, stopAutoSync]);
 
@@ -536,6 +677,28 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     const manager = managerRef.current;
     if (!manager) return;
     await manager.sendToAgent(agentId, data + '\r');
+  }, []);
+
+  const handleMindMapNodeMove = useCallback((nodeId: string, position: MindMapPosition) => {
+    setNodePositions((prev) => ({
+      ...prev,
+      [nodeId]: position,
+    }));
+  }, []);
+
+  const handleMindMapConnect = useCallback((fromNodeId: string, toNodeId: string) => {
+    setManualConnections((prev) =>
+      dedupeMindMapConnections([
+        ...prev,
+        { from: fromNodeId, to: toNodeId, kind: 'manual' },
+      ]),
+    );
+  }, []);
+
+  const handleMindMapDisconnect = useCallback((fromNodeId: string, toNodeId: string) => {
+    setManualConnections((prev) =>
+      prev.filter((connection) => !(connection.from === fromNodeId && connection.to === toNodeId)),
+    );
   }, []);
 
   const rolesToLaunch = buildRolesToLaunch(roleCounts);
@@ -555,21 +718,109 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
   );
   const workspaceName = workspacePath ? getWorkspaceName(workspacePath) : 'workspace';
   const previewAssignments = buildPreviewAssignments(rolesToLaunch);
-  const boardAssignments = coordinatorPlan?.assignments || previewAssignments;
+  const boardAssignmentsBase = coordinatorPlan?.assignments || previewAssignments;
+  const boardAssignments = applyManualConnectionsToAssignments(boardAssignmentsBase, manualConnections);
+  const mindMapConnections = dedupeMindMapConnections([
+    ...buildAutomaticMindMapConnections(boardAssignmentsBase),
+    ...manualConnections,
+  ]);
   const agentsByAssignment = new Map(
     agents.map((agent) => [agent.assignmentId || agent.id, agent]),
   );
 
   const mindMapNodes: MindMapNode[] = boardAssignments.map((assignment) => {
     const agent = agentsByAssignment.get(assignment.id);
-    const { tone } = getAssignmentState(assignment, agent);
+    const { label, tone } = getAssignmentState(assignment, agent);
     return {
       id: assignment.id,
       label: assignment.label,
       role: assignment.role,
       tone,
+      statusLabel: label,
+      workingOn: buildWorkSummary(agent?.assignedTask || assignment.task, assignment.role as SwarmLaunchRole),
+      position: nodePositions[assignment.id],
     };
   });
+
+  const boardAssignmentIdsKey = boardAssignmentsBase.map((assignment) => assignment.id).join('|');
+
+  const handleMindMapRoleDrop = useCallback((roleValue: string, position: MindMapPosition) => {
+    const role = ROLE_ORDER.find((candidate) => candidate === roleValue);
+    if (!role) return;
+
+    if (roleCounts[role] >= ROLE_LIMITS[role].max) {
+      const existingAssignment = [...boardAssignmentsBase]
+        .reverse()
+        .find((assignment) => assignment.role === role);
+
+      if (existingAssignment) {
+        setNodePositions((prev) => ({
+          ...prev,
+          [existingAssignment.id]: position,
+        }));
+      }
+      return;
+    }
+
+    pendingDroppedNodesRef.current.push({ role, position });
+    adjustRoleCount(role, 1);
+  }, [adjustRoleCount, boardAssignmentsBase, roleCounts]);
+
+  useEffect(() => {
+    const activeIds = new Set(boardAssignmentsBase.map((assignment) => assignment.id));
+    const previousIds = new Set(previousBoardAssignmentIdsRef.current);
+    const newlyAddedAssignments = boardAssignmentsBase.filter((assignment) => !previousIds.has(assignment.id));
+
+    setNodePositions((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([nodeId]) => activeIds.has(nodeId)),
+      );
+      const pendingDrops = [...pendingDroppedNodesRef.current];
+
+      for (const assignment of newlyAddedAssignments) {
+        if (next[assignment.id]) continue;
+        const pendingIndex = pendingDrops.findIndex((entry) => entry.role === assignment.role);
+        if (pendingIndex === -1) continue;
+
+        next[assignment.id] = pendingDrops.splice(pendingIndex, 1)[0].position;
+      }
+
+      for (const assignment of boardAssignmentsBase) {
+        if (next[assignment.id]) continue;
+        const pendingIndex = pendingDrops.findIndex((entry) => entry.role === assignment.role);
+        if (pendingIndex !== -1) {
+          next[assignment.id] = pendingDrops.splice(pendingIndex, 1)[0].position;
+          continue;
+        }
+
+        next[assignment.id] = buildDefaultMindMapPosition(
+          boardAssignmentsBase.findIndex((candidate) => candidate.id === assignment.id),
+          boardAssignmentsBase.length,
+        );
+      }
+
+      pendingDroppedNodesRef.current = pendingDrops;
+      return next;
+    });
+
+    setManualConnections((prev) =>
+      dedupeMindMapConnections(
+        prev.filter((connection) => activeIds.has(connection.from) && activeIds.has(connection.to)),
+      ),
+    );
+
+    previousBoardAssignmentIdsRef.current = boardAssignmentsBase.map((assignment) => assignment.id);
+  }, [boardAssignmentIdsKey]);
+
+  useEffect(() => {
+    if (!selectedAgentId) return;
+
+    const activeIds = new Set(boardAssignmentsBase.map((assignment) => assignment.id));
+    if (!activeIds.has(selectedAgentId)) {
+      setSelectedAgentId(null);
+      setAgentChatMsg('');
+    }
+  }, [boardAssignmentIdsKey, selectedAgentId]);
 
   if (!isOpen) return null;
 
@@ -584,27 +835,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
       </div>
 
       <div className="swarm-split-body">
-        <div
-          className={`swarm-mindmap-pane${dragOverMindmap ? ' smm-pane-drop-active' : ''}`}
-          onDragOver={(e) => {
-            if (e.dataTransfer.types.includes(PALETTE_DRAG_KEY)) {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'copy';
-              setDragOverMindmap(true);
-            }
-          }}
-          onDragLeave={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-              setDragOverMindmap(false);
-            }
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOverMindmap(false);
-            const role = e.dataTransfer.getData(PALETTE_DRAG_KEY) as SwarmLaunchRole;
-            if (ROLE_ORDER.includes(role)) adjustRoleCount(role, 1);
-          }}
-        >
+        <div className="swarm-mindmap-pane">
           {/* Role palette — drag chips onto the canvas to add agents */}
           <div className="smm-palette">
             <span className="smm-palette-label">Add agent</span>
@@ -612,21 +843,24 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
               const count = roleCounts[role];
               const limits = ROLE_LIMITS[role];
               const swarmActive = agents.length > 0;
-              const canAdd = !swarmActive && count < limits.max && workerCount < MAX_AGENTS;
+              const canAddMore = count < limits.max && workerCount < MAX_AGENTS;
+              const canPlace = !swarmActive && (canAddMore || count > 0);
               return (
                 <div
                   key={role}
-                  className={`smm-palette-chip${canAdd ? '' : ' disabled'}`}
-                  draggable={canAdd}
+                  className={`smm-palette-chip${canPlace ? '' : ' disabled'}`}
+                  draggable={canPlace}
                   onDragStart={(e) => {
-                    if (!canAdd) { e.preventDefault(); return; }
+                    if (!canPlace) { e.preventDefault(); return; }
                     e.dataTransfer.setData(PALETTE_DRAG_KEY, role);
+                    e.dataTransfer.setData('text/plain', role);
+                    e.dataTransfer.setData('text', role);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   title={
                     swarmActive ? 'Swarm is running — stop it before adjusting the roster'
-                    : !canAdd ? `${role} limit reached`
-                    : `Drag to add a ${role} agent`
+                    : canAddMore ? `Drag to add a ${role} agent`
+                    : `Drag to reposition the ${role} node`
                   }
                 >
                   <span className="smm-palette-dot" style={{ background: PALETTE_ROLE_COLORS[role] }} />
@@ -637,19 +871,18 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
             })}
           </div>
 
-          {/* Drop overlay */}
-          {dragOverMindmap && (
-            <div className="smm-drop-overlay" aria-hidden="true">
-              <span className="smm-drop-overlay-label">Drop to add agent</span>
-            </div>
-          )}
-
           <SwarmMindMap
             nodes={mindMapNodes}
+            connections={mindMapConnections}
             coordinatorStatus={statusLabel}
             isActive={Boolean(coordinatorPlan) || agents.length > 0}
             onAgentClick={(nodeId) => setSelectedAgentId((prev) => prev === nodeId ? null : nodeId)}
             selectedNodeId={selectedAgentId}
+            onNodeMove={handleMindMapNodeMove}
+            onConnect={handleMindMapConnect}
+            onDisconnect={handleMindMapDisconnect}
+            onDropRole={handleMindMapRoleDrop}
+            dragDataKey={PALETTE_DRAG_KEY}
           />
 
           {/* Agent message popover */}

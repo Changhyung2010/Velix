@@ -97,15 +97,11 @@
 }
 
 .edit-approval-added {
-  color: #3fb950;
+  color: var(--text-primary);
 }
 
 .edit-approval-removed {
-  color: #ff6b6b;
-}
-
-.edit-approval-card.light .edit-approval-added {
-  color: #1a7f37;
+  color: var(--accent-red);
 }
 
 .edit-approval-card.light .edit-approval-removed {
@@ -178,8 +174,8 @@
 }
 
 .edit-approval-btn.allow-once {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
 }
 
 .edit-approval-btn.allow-once:hover {
@@ -198,12 +194,12 @@
 
 .edit-approval-btn.deny {
   background: transparent;
-  border-color: rgba(255, 107, 107, 0.45);
+  border-color: color-mix(in srgb, var(--accent-red) 45%, transparent);
   color: var(--accent-red);
 }
 
 .edit-approval-btn.deny:hover {
-  background: rgba(255, 107, 107, 0.1);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
 }
 
 @media (max-width: 768px) {
@@ -271,8 +267,8 @@
 }
 
 .edit-mode-notice-btn.enable {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
 }
 
 .edit-mode-notice-btn.enable:hover {
@@ -641,31 +637,27 @@
 
 /* Semantic git status colors */
 .terminal-meta-chip.git.clean {
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
 .terminal-mini-chip.git.clean {
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-  border-color: rgba(34, 197, 94, 0.28);
-}
-
-.app.light .terminal-meta-chip.git.clean {
-  color: #16a34a;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
 .terminal-meta-chip.git.dirty {
-  background: rgba(255, 185, 80, 0.12);
-  color: var(--accent-yellow);
-  border: 1px solid rgba(255, 185, 80, 0.28);
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+  color: var(--text-secondary);
+  border: 1px solid color-mix(in srgb, var(--text-secondary) 20%, transparent);
 }
 
 .terminal-mini-chip.git.dirty {
-  background: rgba(255, 185, 80, 0.12);
-  color: var(--accent-yellow);
-  border-color: rgba(255, 185, 80, 0.28);
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--text-secondary) 20%, transparent);
 }
 
 .terminal-git-chip:hover {
@@ -951,8 +943,8 @@
   padding: 0 12px;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-size: 11px;
   font-weight: 800;
   font-family: var(--font-mono);
@@ -1014,8 +1006,8 @@
 }
 
 .edit-mode-btn.off {
-  background: rgba(255, 107, 107, 0.1);
-  border-color: rgba(255, 107, 107, 0.35);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-red) 35%, transparent);
   color: var(--accent-red);
 }
 
@@ -1237,20 +1229,20 @@
 
 .icon-btn-tiny.listening {
   animation: pulse-voice 1.5s ease-in-out infinite;
-  background: rgba(255, 107, 107, 0.15) !important;
+  background: color-mix(in srgb, var(--accent-red) 15%, transparent) !important;
   color: var(--accent-red) !important;
-  border-color: rgba(255, 107, 107, 0.4) !important;
+  border-color: color-mix(in srgb, var(--accent-red) 40%, transparent) !important;
 }
 
 @keyframes pulse-voice {
 
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-red) 40%, transparent);
   }
 
   50% {
-    box-shadow: 0 0 0 6px rgba(255, 107, 107, 0);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-red) 0%, transparent);
   }
 }
 
@@ -1501,20 +1493,20 @@
 
 .ai-stop-btn {
   border-radius: 999px;
-  border: 1px solid rgba(255, 107, 107, 0.38);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 38%, transparent);
   padding: 4px 10px;
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
   cursor: pointer;
   transition: opacity 0.12s ease, transform 0.12s ease, background 0.12s ease;
-  background: rgba(255, 107, 107, 0.12);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
   color: var(--accent-red);
 }
 
 .ai-stop-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  background: rgba(255, 107, 107, 0.22);
+  background: color-mix(in srgb, var(--accent-red) 22%, transparent);
 }
 
 .ai-stop-btn:disabled {

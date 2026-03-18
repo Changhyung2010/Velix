@@ -324,13 +324,13 @@
 }
 
 .swarm-cli-badge.available {
-  background: rgba(16, 185, 129, 0.14);
-  color: #10B981;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
 }
 
 .swarm-cli-badge.unavailable {
-  background: rgba(239, 68, 68, 0.14);
-  color: #EF4444;
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  color: var(--text-secondary);
 }
 
 .swarm-cli-command {
@@ -418,8 +418,8 @@
 }
 
 .swarm-primary-btn {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
 }
 
 .swarm-secondary-btn {
@@ -431,7 +431,7 @@
 .swarm-danger-btn {
   background: transparent;
   color: var(--accent-red);
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: color-mix(in srgb, var(--accent-red) 35%, transparent);
 }
 
 .swarm-primary-btn:disabled,
@@ -449,8 +449,8 @@
   gap: 10px;
   padding: 9px 12px;
   border-radius: 10px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 30%, transparent);
   color: var(--accent-red);
   font-size: 11px;
 }
@@ -562,28 +562,28 @@
 }
 
 .swarm-task-status.mapping {
-  background: rgba(15, 118, 110, 0.14);
-  color: #0F766E;
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  color: var(--text-muted);
 }
 
 .swarm-task-status.building {
-  background: rgba(37, 99, 235, 0.14);
-  color: #2563EB;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
 }
 
 .swarm-task-status.review {
-  background: rgba(180, 83, 9, 0.14);
-  color: #B45309;
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  color: var(--text-secondary);
 }
 
 .swarm-task-status.done {
-  background: rgba(16, 185, 129, 0.14);
-  color: #10B981;
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
 }
 
 .swarm-task-status.blocked {
-  background: rgba(239, 68, 68, 0.14);
-  color: #EF4444;
+  background: color-mix(in srgb, var(--border-default) 28%, transparent);
+  color: var(--text-secondary);
 }
 
 .swarm-task-main {
@@ -680,15 +680,15 @@
 }
 
 .swarm-log-entry.sync {
-  border-left: 2px solid #3B82F6;
+  border-left: 2px solid var(--text-secondary);
 }
 
 .swarm-log-entry.dispatch {
-  border-left: 2px solid #10B981;
+  border-left: 2px solid var(--text-primary);
 }
 
 .swarm-log-entry.error {
-  border-left: 2px solid #EF4444;
+  border-left: 2px solid var(--border-default);
 }
 
 .swarm-log-time {
@@ -854,6 +854,7 @@
   overflow: hidden;
   cursor: grab;
   user-select: none;
+  isolation: isolate;
 }
 
 .swarm-mindmap.smm-dragging {
@@ -871,86 +872,230 @@
 .smm-wires {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  overflow: visible;
 }
 
-.smm-hex-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-/* ---- Shared node base ---- */
 .smm-node {
   position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
   pointer-events: none;
-  /* Centered on the (left, top) coordinate */
   transform: translate(-50%, -50%);
 }
 
-/* ---- SVG text (shared for both coordinator and agent nodes) ---- */
-.smm-svg-title {
-  font-size: 10px;
-  font-weight: 700;
-  fill: var(--text-primary);
-  font-family: inherit;
-}
-
-.smm-svg-sub {
-  font-size: 8.5px;
-  fill: var(--accent-primary);
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.smm-svg-role {
-  font-size: 8px;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  /* fill is set inline via style prop */
-}
-
-/* ---- Coordinator node (no longer needs custom HTML text rules) ---- */
 .smm-coordinator-node {
   pointer-events: none;
 }
 
-/* ---- Agent node ---- */
-.smm-agent-ring-svg {
-  display: block;
+.smm-coordinator-card {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-primary) 18%, transparent) 0%, transparent 52%),
+    linear-gradient(160deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 38%, var(--border-default));
+  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.12);
+}
+
+.smm-coordinator-node.smm-active .smm-coordinator-card {
+  box-shadow:
+    0 20px 36px rgba(0, 0, 0, 0.14),
+    0 0 0 1px color-mix(in srgb, var(--accent-primary) 28%, transparent);
+}
+
+.smm-coordinator-label {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.smm-coordinator-card strong {
+  font-size: 16px;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.smm-coordinator-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.smm-root-link {
   pointer-events: none;
-  flex-shrink: 0;
+  opacity: 0.42;
+  stroke-dasharray: 7 7;
 }
 
 .smm-agent-node {
-  /* width/height now set inline to match agentRingSvgSize */
-  flex-direction: column;
+  pointer-events: auto;
+  cursor: pointer !important;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.smm-agent-node:hover {
+  filter: brightness(1.04);
+}
+
+.smm-agent-node.smm-running .smm-agent-card-shell {
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--status-color) 34%, transparent);
+}
+
+.smm-agent-node.smm-selected .smm-agent-card-shell {
+  border-color: var(--accent-primary);
+  box-shadow:
+    0 22px 40px rgba(0, 0, 0, 0.16),
+    0 0 0 2px color-mix(in srgb, var(--accent-primary) 28%, transparent);
+}
+
+.smm-agent-card-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--role-color) 34%, var(--border-default));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--role-color) 14%, var(--bg-secondary)) 0%, var(--bg-secondary) 36%, var(--bg-primary) 100%);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.smm-agent-card-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--role-color) 0%, color-mix(in srgb, var(--role-color) 30%, transparent) 100%);
+}
+
+.smm-agent-node-head {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.smm-agent-node-role {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--role-color);
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+}
+
+.smm-agent-node-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.smm-agent-node-caption {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.smm-agent-node-work {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .smm-node-badge {
-  display: block;
-  margin-top: 5px;
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 3px 8px;
   border-radius: 999px;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   font-family: var(--font-mono);
   letter-spacing: 0.08em;
-  color: #fff;
+  color: var(--bg-primary);
   white-space: nowrap;
-  flex-shrink: 0;
+  text-transform: uppercase;
 }
 
-/* ---- Empty state ---- */
+.smm-node-port {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid var(--bg-primary);
+  background: var(--role-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--role-color) 45%, var(--border-default));
+  transform: translateY(-50%);
+}
+
+.smm-node-port-in {
+  left: -8px;
+  pointer-events: none;
+}
+
+.smm-node-port-out {
+  right: -8px;
+  padding: 0;
+  cursor: crosshair;
+  outline: none;
+  appearance: none;
+  transform: translateY(-50%);
+}
+
+.smm-node-port-out:hover {
+  transform: translateY(-50%) scale(1.1) !important;
+}
+
+.smm-node-port-out:active {
+  transform: translateY(-50%) scale(1.02) !important;
+}
+
+.smm-link-line {
+  fill: none;
+  pointer-events: stroke;
+  opacity: 0.85;
+  transition: opacity 0.12s ease, stroke-width 0.12s ease;
+}
+
+.smm-link-line:hover {
+  opacity: 1;
+}
+
+.smm-link-automatic {
+  opacity: 0.46;
+}
+
+.smm-link-manual {
+  cursor: pointer;
+}
+
+.smm-link-selected {
+  opacity: 1;
+}
+
+.smm-link-preview {
+  stroke-dasharray: 6 6;
+  opacity: 0.95;
+}
+
 .smm-empty {
   position: absolute;
   inset: 0;
@@ -963,6 +1108,11 @@
   font-size: 11px;
   text-align: center;
   pointer-events: none;
+}
+
+.smm-empty-glyph {
+  font-size: 26px;
+  color: var(--text-hint);
 }
 
 /* =====================================================
@@ -1037,24 +1187,6 @@
   min-width: 32px;
   text-align: center;
   padding: 0 2px;
-}
-
-/* =====================================================
-   AGENT NODE — clickable + selected state
-   ===================================================== */
-
-.smm-agent-node {
-  pointer-events: auto;
-  cursor: pointer !important; /* override container grab cursor */
-  transition: filter 0.15s;
-}
-
-.smm-agent-node:hover {
-  filter: brightness(1.1);
-}
-
-.smm-agent-node.smm-selected .smm-svg-title {
-  fill: var(--accent-primary);
 }
 
 /* =====================================================
@@ -1163,8 +1295,8 @@
   padding: 7px 14px;
   border: none;
   border-radius: 8px;
-  background: var(--accent-primary);
-  color: #fff;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;

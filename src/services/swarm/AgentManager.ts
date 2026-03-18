@@ -89,8 +89,6 @@ export interface WorkerCLIStatus {
   detail: string;
 }
 
-const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\"'\"'`)}'`;
-
 export async function detectWorkerCLIAvailability(
   _cwd: string,
 ): Promise<Record<WorkerCLI, WorkerCLIStatus>> {

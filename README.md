@@ -141,6 +141,12 @@ Velix is built on [**OpenCode**](https://opencode.ai) by [Anomaly](https://githu
 
 ---
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Changhyung2010/Velix&type=Date)](https://www.star-history.com/#Changhyung2010/Velix&Date)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE) for details.

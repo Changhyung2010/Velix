@@ -14,108 +14,112 @@
 }
 
 /* ========== LIGHT THEME ========== */
-/* Warm cream/parchment — professional, paper-like quality */
+/* Neutral monochrome — crisp grayscale surfaces with black emphasis */
 .app.light {
-  --bg-primary: #faf7f0;
-  --bg-secondary: #f2ebe0;
-  --bg-sidebar: #ece4d5;
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-sidebar: #ececf0;
   --bg-input: #ffffff;
-  --bg-code: #f2ebe0;
-  --bg-terminal: #faf7f0;
-  --bg-terminal-topbar: #f2ebe0;
-  --bg-hover: rgba(90, 65, 30, 0.07);
-  --bg-active: rgba(6, 80, 80, 0.12);
+  --bg-code: #efeff2;
+  --bg-terminal: #f5f5f7;
+  --bg-terminal-topbar: #ececf0;
+  --bg-hover: rgba(17, 17, 17, 0.05);
+  --bg-active: rgba(17, 17, 17, 0.08);
 
-  --border-light: #ddd4c0;
-  --border-default: #cfc5ae;
-  --border-glow: rgba(6, 80, 80, 0.22);
+  --border-light: #e4e4e8;
+  --border-default: #cbccd2;
+  --border-glow: rgba(17, 17, 17, 0.12);
 
-  --text-primary: #271e10;
-  --text-secondary: #5a4a36;
-  --text-muted: #8a7660;
-  --text-hint: #a89070;
-  --text-faint: #cfc0a8;
+  --text-primary: #101114;
+  --text-secondary: #3a3c42;
+  --text-muted: #6c6f78;
+  --text-hint: #91939c;
+  --text-faint: #d9d9de;
 
-  --accent-primary: #065E5E;
-  --accent-primary-light: #088080;
-  --accent-primary-dark: #043F3F;
+  --accent-primary: #111111;
+  --accent-primary-light: #2d2e34;
+  --accent-primary-dark: #050506;
 
-  --accent-blue: #065E5E;
-  --accent-cyan: #088080;
-  --accent-green: #065E5E;
-  --accent-purple: #065E5E;
-  --accent-pink: #065E5E;
-  --accent-red: #C0392B;
-  --accent-yellow: #B7791F;
-  --accent-orange: #C05621;
+  --accent-blue: #1c1d21;
+  --accent-cyan: #303137;
+  --accent-green: #42434b;
+  --accent-purple: #545660;
+  --accent-pink: #686a75;
+  --accent-red: #2d2e34;
+  --accent-yellow: #4d4f58;
+  --accent-orange: #696b74;
 
-  --glow-blue: rgba(6, 94, 94, 0.22);
-  --glow-green: rgba(6, 94, 94, 0.22);
-  --glow-purple: rgba(6, 94, 94, 0.22);
-  --glow-primary: rgba(6, 94, 94, 0.28);
+  --glow-blue: rgba(17, 17, 17, 0.1);
+  --glow-green: rgba(17, 17, 17, 0.1);
+  --glow-purple: rgba(17, 17, 17, 0.1);
+  --glow-primary: rgba(17, 17, 17, 0.18);
 
-  --gradient-accent: linear-gradient(135deg, #043F3F 0%, #065E5E 100%);
-  --gradient-terminal: linear-gradient(180deg, #faf7f0 0%, #f2ebe0 100%);
+  --gradient-accent: linear-gradient(135deg, #111111 0%, #3d3f45 100%);
+  --gradient-terminal: linear-gradient(180deg, #ffffff 0%, #efeff2 100%);
 
-  --btn-primary-bg: #065E5E;
-  --btn-primary-hover: #088080;
-  --btn-primary-active: #043F3F;
-  --btn-secondary-bg: #f2ebe0;
-  --btn-secondary-hover: #ece4d5;
+  --btn-primary-bg: #111111;
+  --btn-primary-hover: #2d2e34;
+  --btn-primary-active: #050506;
+  --btn-primary-fg: #ffffff;
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-hover: #efeff2;
+  --btn-secondary-fg: #111111;
 
   color: var(--text-primary);
   background: var(--bg-primary);
 }
 
 /* ========== DARK THEME ========== */
-/* Neutral dark gray — professional, no warm/green tint */
+/* Neutral monochrome — graphite surfaces with white emphasis */
 .app.dark {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252525;
-  --bg-sidebar: #181818;
-  --bg-input: #2a2a2a;
-  --bg-code: #222222;
-  --bg-terminal: #1e1e1e;
-  --bg-terminal-topbar: #252525;
+  --bg-primary: #0f1012;
+  --bg-secondary: #17181b;
+  --bg-sidebar: #0b0c0e;
+  --bg-input: #141519;
+  --bg-code: #111215;
+  --bg-terminal: #0f1012;
+  --bg-terminal-topbar: #17181b;
   --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-active: rgba(13, 148, 136, 0.18);
+  --bg-active: rgba(255, 255, 255, 0.1);
 
-  --border-light: #2e2e2e;
-  --border-default: #3c3c3c;
-  --border-glow: rgba(13, 148, 136, 0.35);
+  --border-light: #212227;
+  --border-default: #303238;
+  --border-glow: rgba(255, 255, 255, 0.1);
 
-  --text-primary: #d4d4d4;
-  --text-secondary: #9e9e9e;
-  --text-muted: #626262;
-  --text-hint: #484848;
-  --text-faint: #323232;
+  --text-primary: #f3f4f6;
+  --text-secondary: #cfd1d7;
+  --text-muted: #8e919a;
+  --text-hint: #676a73;
+  --text-faint: #26282d;
 
-  --accent-primary: #0D9488;
-  --accent-primary-light: #14B8A6;
-  --accent-primary-dark: #0F766E;
+  --accent-primary: #f2f2f3;
+  --accent-primary-light: #ffffff;
+  --accent-primary-dark: #d2d4d9;
 
-  --accent-blue: #0D9488;
-  --accent-cyan: #14B8A6;
-  --accent-green: #0D9488;
-  --accent-purple: #0D9488;
-  --accent-pink: #0D9488;
-  --accent-red: #F87171;
-  --accent-yellow: #FBBF24;
-  --accent-orange: #FB923C;
+  --accent-blue: #f2f2f3;
+  --accent-cyan: #d6d7dc;
+  --accent-green: #b8bac1;
+  --accent-purple: #9ea0a9;
+  --accent-pink: #858893;
+  --accent-red: #d0d2d8;
+  --accent-yellow: #a7aab3;
+  --accent-orange: #8d9099;
 
-  --glow-blue: rgba(13, 148, 136, 0.3);
-  --glow-green: rgba(13, 148, 136, 0.3);
-  --glow-purple: rgba(13, 148, 136, 0.3);
-  --glow-primary: rgba(13, 148, 136, 0.38);
+  --glow-blue: rgba(255, 255, 255, 0.1);
+  --glow-green: rgba(255, 255, 255, 0.1);
+  --glow-purple: rgba(255, 255, 255, 0.1);
+  --glow-primary: rgba(255, 255, 255, 0.16);
 
-  --gradient-accent: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
-  --gradient-terminal: linear-gradient(180deg, #252525 0%, #1e1e1e 100%);
+  --gradient-accent: linear-gradient(135deg, #3a3b40 0%, #1b1c20 100%);
+  --gradient-terminal: linear-gradient(180deg, #17181b 0%, #0f1012 100%);
 
-  --btn-primary-bg: #0D9488;
-  --btn-primary-hover: #14B8A6;
-  --btn-primary-active: #0F766E;
-  --btn-secondary-bg: #252525;
-  --btn-secondary-hover: #2e2e2e;
+  --btn-primary-bg: #f2f2f3;
+  --btn-primary-hover: #ffffff;
+  --btn-primary-active: #d8d9de;
+  --btn-primary-fg: #111111;
+  --btn-secondary-bg: #17181b;
+  --btn-secondary-hover: #202126;
+  --btn-secondary-fg: #f2f2f3;
 
   color: var(--text-primary);
   background: var(--bg-primary);
@@ -587,8 +591,8 @@ html, body, #root {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-size: 10px;
   font-weight: 700;
   flex-shrink: 0;
@@ -1035,8 +1039,8 @@ html, body, #root {
 }
 
 .ai-badge {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   font-size: 9px;
   font-weight: 600;
   padding: 2px 6px;
@@ -1562,9 +1566,9 @@ html, body, #root {
 }
 
 .tool-btn.active .tool-icon {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: #ffffff;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   box-shadow: 0 0 12px var(--glow-primary);
   transform: scale(1.05);
 }
@@ -1635,17 +1639,12 @@ html, body, #root {
   justify-content: space-between;
   height: 22px;
   padding: 0 12px;
-  background: var(--accent-primary);
+  background: var(--gradient-accent);
   color: rgba(255, 255, 255, 0.85);
   font-size: 11px;
   font-family: var(--font-mono);
   user-select: none;
   overflow: hidden;
-}
-
-.app.light .status-bar {
-  background: var(--accent-primary-dark);
-  color: rgba(255, 255, 255, 0.9);
 }
 
 .status-left,
@@ -1782,71 +1781,74 @@ html, body, #root {
 
 .terminal-topbar {
   display: flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 0 0 14px;
+  flex-direction: column;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-default);
-  gap: 10px;
   flex-shrink: 0;
   overflow: hidden;
 }
 
-.topbar-tools {
+.terminal-tab-row {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  padding-right: 2px;
-}
-
-.topbar-tools .activity-btn {
-  width: 30px;
-  height: 30px;
-}
-
-.topbar-tools .activity-btn-wrap {
-  width: auto;
-}
-
-.app.dark .terminal-topbar {
-  background: var(--bg-secondary);
-  border-bottom-color: var(--border-light);
-}
-
-.terminal-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
+  align-items: stretch;
+  min-height: 38px;
+  overflow: hidden;
 }
 
 .workspace-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  max-width: 280px;
-  flex-shrink: 1;
+  flex: 1 1 auto;
+}
+
+.workspace-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--bg-terminal-topbar);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.workspace-label {
+  color: var(--text-hint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .workspace-open-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  gap: 8px;
+  width: auto;
+  height: 30px;
+  padding: 0 12px;
   border: 1px solid var(--border-light);
-  border-radius: 7px;
+  border-radius: 999px;
   background: var(--bg-hover);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
+.workspace-open-btn span {
+  white-space: nowrap;
+}
+
 .workspace-open-btn:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-active);
   color: var(--accent-primary);
   border-color: var(--accent-primary);
   transform: none;
@@ -1855,13 +1857,14 @@ html, body, #root {
 .workspace-summary {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
-  gap: 1px;
+  gap: 2px;
 }
 
 .workspace-name {
   color: var(--text-primary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;
   font-family: var(--font-sans);
@@ -1872,97 +1875,90 @@ html, body, #root {
 
 .workspace-path {
   color: var(--text-hint);
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.workspace-branch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.workspace-branch-chip svg {
+  opacity: 0.65;
+}
+
 /* Responsive terminal topbar */
 @media (max-width: 768px) {
-  .terminal-topbar {
-    padding: 0 12px;
-    gap: 8px;
+  .terminal-tab-row {
+    min-height: 36px;
   }
 
-  .topbar-tools {
-    gap: 2px;
-  }
-
-  .topbar-tools .activity-btn {
-    width: 28px;
-    height: 28px;
-  }
-
-  .terminal-topbar-actions {
-    gap: 8px;
-  }
-
-  .workspace-bar {
-    max-width: 46%;
+  .workspace-strip {
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
   }
 
   .workspace-path {
     display: none;
   }
 
-  .model-selector,
-  .provider-selector {
-    padding: 4px 8px;
-  }
-
-  .provider-label {
+  .workspace-label,
+  .workspace-branch-chip {
     display: none;
   }
 
-  .model-select,
-  .provider-select {
-    font-size: 11px;
+  .workspace-open-btn {
+    padding: 0 10px;
   }
 }
 
 @media (max-width: 640px) {
-  .terminal-tabs {
+  .terminal-tab-row {
+    min-height: 34px;
+  }
+
+  .workspace-strip {
+    padding: 8px 10px;
+  }
+
+  .workspace-open-btn {
+    width: 32px;
+    padding: 0;
+  }
+
+  .workspace-open-btn span {
     display: none;
   }
 
-  .topbar-tools {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-right: 6px;
-  }
-
-  .workspace-bar {
-    max-width: none;
-    flex: 1;
-  }
-
-  .model-selector {
-    padding: 4px 6px;
-  }
-
-  .model-select {
-    font-size: 10px;
-    max-width: 100px;
+  .workspace-name {
+    font-size: 11px;
   }
 }
 
 @media (max-width: 480px) {
-  .terminal-topbar {
-    padding: 0 8px;
+  .workspace-strip {
+    gap: 8px;
+    padding: 8px;
   }
 
-  .model-selector,
-  .provider-selector {
-    padding: 3px 6px;
-    border-radius: 4px;
-  }
-
-  .model-select,
-  .provider-select {
-    font-size: 9px;
-    max-width: 80px;
+  .workspace-open-btn {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -1980,8 +1976,24 @@ html, body, #root {
   padding: 0;
 }
 
-.terminal-body.split-view {
-  gap: 0;
+.terminal-tab-panel {
+  flex: 1 1 auto;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.terminal-tab-panel.split-view {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-primary);
+  align-content: stretch;
+  grid-auto-flow: row;
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 .terminal-body .terminal-container {
@@ -2378,7 +2390,7 @@ html, body, #root {
   align-items: stretch;
   flex: 1;
   overflow-x: auto;
-  height: 36px;
+  height: 38px;
   scrollbar-width: none;
 }
 
@@ -2391,7 +2403,7 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   padding: 0 14px;
-  height: 36px;
+  height: 38px;
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-hint);
@@ -2399,6 +2411,7 @@ html, body, #root {
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
   border: none;
+  border-top: 2px solid transparent;
   border-right: 1px solid var(--border-light);
   position: relative;
   user-select: none;
@@ -2412,7 +2425,7 @@ html, body, #root {
 .terminal-tab.active {
   background: var(--bg-terminal);
   color: var(--text-primary);
-  border-top: 1px solid var(--accent-primary);
+  border-top-color: var(--accent-primary);
 }
 
 .app.dark .terminal-tab.active {
@@ -2468,8 +2481,8 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border: none;
   background: transparent;
   color: var(--text-hint);
@@ -2494,38 +2507,52 @@ html, body, #root {
   .terminal-tabs {
     gap: 2px;
     padding-right: 4px;
+    height: 36px;
   }
 
   .terminal-tab {
-    padding: 4px 10px;
+    height: 36px;
+    padding: 0 10px;
     font-size: 11px;
     min-width: 60px;
     max-width: 120px;
   }
 
   .terminal-tab-add {
-    width: 24px;
-    height: 24px;
+    width: 36px;
+    height: 36px;
     font-size: 16px;
   }
 }
 
 @media (max-width: 640px) {
+  .terminal-tabs {
+    height: 34px;
+  }
+
   .terminal-tab {
-    padding: 4px 8px;
+    height: 34px;
+    padding: 0 8px;
     font-size: 10px;
     min-width: 50px;
-    max-width: 80px;
+    max-width: 110px;
   }
 
   .terminal-tab-title {
     font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .terminal-tab-close {
     width: 14px;
     height: 14px;
     font-size: 10px;
+  }
+
+  .terminal-tab-add {
+    width: 34px;
+    height: 34px;
   }
 }
 
@@ -2543,26 +2570,34 @@ html, body, #root {
 }
 
 /* Split view styling */
-.terminal-body.split-view .terminal-tab-content {
-  /* no border — the resize handle provides visual separation */
+.terminal-tab-panel.split-view .terminal-tab-content {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-terminal);
 }
 
-/* Drag handle between split terminals */
-.split-resize-handle {
-  width: 4px;
-  min-width: 4px;
-  height: 100%;
-  background: var(--border-default);
-  cursor: col-resize;
-  flex-shrink: 0;
-  transition: background 0.15s ease, width 0.1s ease;
-  position: relative;
-  z-index: 10;
+.terminal-tab-content.dragging {
+  opacity: 0.48;
 }
 
-.split-resize-handle:hover {
-  background: var(--accent-primary);
-  width: 4px;
+.terminal-pane-drop-preview {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 12px;
+  border: 2px dashed var(--border-strong);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--text-primary) 4%, transparent) 0 10px,
+      transparent 10px 20px
+    ),
+    var(--bg-terminal);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
 /* Split terminal header */
@@ -2577,6 +2612,35 @@ html, body, #root {
   font-weight: 500;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.split-terminal-header.draggable {
+  cursor: grab;
+}
+
+.split-terminal-header.draggable:active {
+  cursor: grabbing;
+}
+
+.split-terminal-title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.split-terminal-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.split-terminal-drag {
+  font-size: 12px;
+  color: var(--text-hint);
+  letter-spacing: -1px;
+  user-select: none;
 }
 
 .terminal-tab-content.active .split-terminal-header {

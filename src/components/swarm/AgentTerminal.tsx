@@ -53,13 +53,13 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
 
   const getStatusColor = () => {
     switch (agent.status) {
-      case 'running': return '#10B981';
+      case 'running': return 'var(--text-primary)';
       case 'waiting_for_input':
-      case 'waiting_for_approval': return '#F59E0B';
-      case 'completed': return '#3B82F6';
+      case 'waiting_for_approval': return 'var(--text-muted)';
+      case 'completed': return 'var(--accent-primary)';
       case 'failed':
-      case 'terminated': return '#EF4444';
-      default: return '#6B7280';
+      case 'terminated': return 'var(--border-default)';
+      default: return 'var(--text-hint)';
     }
   };
 

@@ -27,6 +27,17 @@ dist-ssr
 src-tauri/target/
 target/
 Cargo.lock
+src-tauri/icons/android/
+src-tauri/icons/ios/
+src-tauri/icons/64x64.png
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Local release artifacts
+*.dmg
 
 # Test files (can be removed if not needed)
 *.test.js

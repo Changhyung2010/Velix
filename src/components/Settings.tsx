@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "../platform/native";
+import velixLogo from "../../velixlogo.png";
 import "./Settings.css";
 
 export interface AIProvider {
@@ -165,14 +166,11 @@ export interface AIConfig {
     apiKey: string;
 }
 
-// Free providers that don't strictly require a paid plan
-const FREE_PROVIDERS = new Set(["groq", "mistral"]);
-
 export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThemeChange }: SettingsProps) {
     const [activeTab, setActiveTab] = useState<"providers" | "appearance" | "about">("providers");
     const [selectedProvider, setSelectedProvider] = useState<AIProvider["id"]>(currentConfig?.provider || "claude");
     const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
-    const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
+    const [selectedModels] = useState<Record<string, string>>({});
     const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
     const [showSteps, setShowSteps] = useState<Record<string, boolean>>({});
 
@@ -218,22 +216,16 @@ export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThem
         onSave({ provider: providerId, model, apiKey });
     };
 
-    // Model is now changed in terminal section, not here
-    const _handleModelChange = (providerId: string, model: string) => {
-        setSelectedModels(prev => ({ ...prev, [providerId]: model }));
-        if (providerId === selectedProvider) {
-            onSave({ provider: selectedProvider, model, apiKey: apiKeys[providerId] || "" });
-        }
-    };
-    void _handleModelChange; // Suppress unused warning
-
     if (!isOpen) return null;
 
     return (
         <div className="settings-overlay" onClick={onClose}>
             <div className="settings-modal" onClick={e => e.stopPropagation()}>
                 <div className="settings-header">
-                    <h2>Settings</h2>
+                    <div className="settings-title-group">
+                        <h2>Settings</h2>
+                        <span className="settings-beta-tag">BETA</span>
+                    </div>
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
 
@@ -358,7 +350,7 @@ export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThem
                         {activeTab === "appearance" && (
                             <div className="appearance-tab">
                                 <p className="settings-description">
-                                    Customize the look and feel of Velix.
+                                    Choose the interface theme for Velix.
                                 </p>
 
                                 <div className="appearance-section">
@@ -380,24 +372,16 @@ export function Settings({ isOpen, onClose, onSave, currentConfig, theme, onThem
                                         </button>
                                     </div>
                                 </div>
-
-                                <div className="appearance-section">
-                                    <h4>Color Scheme</h4>
-                                    <div className="color-preview">
-                                        <div className="color-swatch primary" style={{ background: theme === "dark" ? "#5a9e54" : "#345830" }}></div>
-                                        <div className="color-swatch secondary" style={{ background: theme === "dark" ? "#0a0a0a" : "#ffffff" }}></div>
-                                        <div className="color-swatch tertiary" style={{ background: theme === "dark" ? "#fafafa" : "#0a0a0a" }}></div>
-                                    </div>
-                                    <p className="color-hint">Forest Green (#345830) with monochrome accents</p>
-                                </div>
                             </div>
                         )}
 
                         {activeTab === "about" && (
                             <div className="about-tab">
+                                <img src={velixLogo} alt="Velix logo" className="about-logo" />
+                                <p className="about-eyebrow">BETA version</p>
                                 <h3>Velix</h3>
                                 <p>AI-Native Developer Terminal</p>
-                                <p className="version">Version 0.1.0</p>
+                                <p className="version">Version 0.1.0 Beta</p>
                             </div>
                         )}
                     </div>

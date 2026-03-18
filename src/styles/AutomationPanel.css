@@ -59,7 +59,7 @@
 /* API key warning */
 .automation-api-key-required {
   padding: 14px 16px;
-  background: rgba(239, 68, 68, 0.12);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
   border: 1px solid var(--accent-red);
   border-radius: 8px;
 }
@@ -296,21 +296,21 @@
 }
 
 .complexity-badge.low {
-  background: rgba(63, 185, 80, 0.15);
-  color: #3fb950;
-  border: 1px solid rgba(63, 185, 80, 0.3);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 24%, transparent);
 }
 
 .complexity-badge.medium {
-  background: rgba(var(--accent-yellow-rgb, 255, 198, 109), 0.15);
-  color: var(--accent-yellow);
-  border: 1px solid rgba(var(--accent-yellow-rgb, 255, 198, 109), 0.3);
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  color: var(--text-secondary);
+  border: 1px solid color-mix(in srgb, var(--text-secondary) 24%, transparent);
 }
 
 .complexity-badge.high {
-  background: rgba(239, 68, 68, 0.15);
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
   color: var(--accent-red);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 26%, transparent);
 }
 
 .agent-count-badge {
@@ -372,7 +372,7 @@
 
 .subtask-card.error {
   border-color: var(--accent-red);
-  background: rgba(239, 68, 68, 0.07);
+  background: color-mix(in srgb, var(--accent-red) 8%, transparent);
 }
 
 .subtask-header {
@@ -417,12 +417,12 @@
 }
 
 .dispatch-badge.dispatched {
-  background: rgba(63, 185, 80, 0.15);
-  color: #3fb950;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
 }
 
 .dispatch-badge.error-badge {
-  background: rgba(239, 68, 68, 0.15);
+  background: color-mix(in srgb, var(--accent-red) 12%, transparent);
   color: var(--accent-red);
 }
 

@@ -1,399 +1,732 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 export type NodeTone = 'queued' | 'mapping' | 'building' | 'review' | 'done' | 'blocked';
+
+export interface MindMapPosition {
+  x: number;
+  y: number;
+}
+
+export interface MindMapConnection {
+  from: string;
+  to: string;
+  kind?: 'automatic' | 'manual';
+}
 
 export interface MindMapNode {
   id: string;
   label: string;
   role: string;
   tone: NodeTone;
+  workingOn?: string;
+  statusLabel?: string;
+  position?: MindMapPosition;
 }
 
 interface SwarmMindMapProps {
   nodes: MindMapNode[];
+  connections?: MindMapConnection[];
   coordinatorStatus: string;
   isActive: boolean;
   onAgentClick?: (nodeId: string) => void;
   selectedNodeId?: string | null;
+  onNodeMove?: (nodeId: string, position: MindMapPosition) => void;
+  onConnect?: (fromNodeId: string, toNodeId: string) => void;
+  onDisconnect?: (fromNodeId: string, toNodeId: string) => void;
+  onDropRole?: (role: string, position: MindMapPosition) => void;
+  dragDataKey?: string;
 }
 
 const TONE_COLORS: Record<NodeTone, string> = {
-  queued: '#6B7280',
-  mapping: '#06B6D4',
-  building: '#3B82F6',
-  review: '#F59E0B',
-  done: '#10B981',
-  blocked: '#EF4444',
+  queued: 'var(--text-hint)',
+  mapping: 'var(--text-muted)',
+  building: 'var(--text-secondary)',
+  review: 'var(--accent-primary-dark)',
+  done: 'var(--accent-primary)',
+  blocked: 'var(--border-default)',
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  scout: '#06B6D4',
-  builder: '#8B5CF6',
-  reviewer: '#F59E0B',
+  scout: 'var(--text-muted)',
+  builder: 'var(--text-primary)',
+  reviewer: 'var(--text-secondary)',
 };
 
-// Slightly larger nodes so text fits comfortably inside the shapes
-const COORD_R = 42;   // hexagon circumradius — flat-to-flat ≈ 72 px
-const AGENT_R = 30;   // circle radius inside the ring SVG — outer ring at +4 = 34
-const MAX_COLS = 4;
-const MIN_ZOOM = 0.35;
-const MAX_ZOOM = 2.5;
-// Threshold (px) before a mousedown counts as a drag rather than a click
+const MIN_ZOOM = 0.4;
+const MAX_ZOOM = 2.2;
 const DRAG_THRESHOLD = 4;
+const COORDINATOR_WIDTH = 210;
+const COORDINATOR_HEIGHT = 84;
+const NODE_WIDTH = 196;
+const NODE_HEIGHT = 102;
+const NODE_VISIBLE_EDGE_X = 28;
+const NODE_VISIBLE_EDGE_Y = 22;
 
-const hexPath = (cx: number, cy: number, r: number): string => {
-  const pts: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 6;
-    pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
-  }
-  return `M ${pts.join(' L ')} Z`;
+interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+interface ResolvedMindMapNode extends MindMapNode {
+  center: CanvasPoint;
+  roleColor: string;
+  statusColor: string;
+}
+
+interface InteractionState {
+  mode: 'idle' | 'pan' | 'node' | 'connect';
+  pointerId: number | null;
+  startClientX: number;
+  startClientY: number;
+  initialPanX: number;
+  initialPanY: number;
+  nodeId?: string;
+  nodeOffsetX?: number;
+  nodeOffsetY?: number;
+  fromNodeId?: string;
+  moved: boolean;
+}
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max);
+
+const truncateText = (value: string, max: number): string =>
+  value.length > max ? `${value.slice(0, max - 1)}…` : value;
+
+export const buildDefaultMindMapPosition = (index: number, total: number): MindMapPosition => {
+  const safeTotal = Math.max(total, 1);
+  const cols = Math.min(3, safeTotal);
+  const rows = Math.ceil(safeTotal / cols);
+  const row = Math.floor(index / cols);
+  const isLastRow = row === rows - 1;
+  const nodesInRow = isLastRow ? safeTotal - row * cols : cols;
+  const col = index - row * cols;
+  const xStep = 0.74 / Math.max(nodesInRow - 1, 1);
+  const x = nodesInRow === 1 ? 0.5 : 0.13 + col * xStep;
+  const yStep = rows === 1 ? 0 : 0.42 / Math.max(rows - 1, 1);
+  const y = 0.36 + row * yStep;
+
+  return {
+    x: clamp(x, 0.08, 0.92),
+    y: clamp(y, 0.24, 0.9),
+  };
 };
+
+const buildCurvePath = (from: CanvasPoint, to: CanvasPoint): string => {
+  const horizontalDistance = Math.abs(to.x - from.x);
+  const controlOffset = Math.max(56, horizontalDistance * 0.36);
+  return [
+    `M ${from.x} ${from.y}`,
+    `C ${from.x + controlOffset} ${from.y}, ${to.x - controlOffset} ${to.y}, ${to.x} ${to.y}`,
+  ].join(' ');
+};
+
+const formatTone = (value: string): string => value.toUpperCase();
 
 export const SwarmMindMap: React.FC<SwarmMindMapProps> = ({
   nodes,
+  connections = [],
   coordinatorStatus,
   isActive,
   onAgentClick,
   selectedNodeId,
+  onNodeMove,
+  onConnect,
+  onDisconnect,
+  onDropRole,
+  dragDataKey,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 500, h: 400 });
-  const [zoom, setZoom] = useState(1.0);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Mutable drag state — stored in a ref so document handlers don't need deps
-  const dragRef = useRef({
-    active: false,
-    startX: 0,
-    startY: 0,
-    initPanX: 0,
-    initPanY: 0,
+  const panRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1);
+  const interactionRef = useRef<InteractionState>({
+    mode: 'idle',
+    pointerId: null,
+    startClientX: 0,
+    startClientY: 0,
+    initialPanX: 0,
+    initialPanY: 0,
     moved: false,
   });
+  const suppressClickRef = useRef<string | null>(null);
 
-  // Keep a ref to current pan so mousedown handler can read it without re-binding
-  const panRef = useRef(pan);
-  useEffect(() => { panRef.current = pan; }, [pan]);
+  const [size, setSize] = useState({ w: 500, h: 400 });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [isDropActive, setIsDropActive] = useState(false);
+  const [connectionPreview, setConnectionPreview] = useState<{
+    fromNodeId: string;
+    point: CanvasPoint;
+  } | null>(null);
 
-  // Responsive canvas size via ResizeObserver
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    panRef.current = pan;
+  }, [pan]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
     const observer = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setSize({ w: Math.max(width, 200), h: Math.max(height, 200) });
+      const entry = entries[0];
+      if (!entry) return;
+      setSize({
+        w: Math.max(entry.contentRect.width, 320),
+        h: Math.max(entry.contentRect.height, 240),
+      });
     });
-    observer.observe(el);
+
+    observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
-  // Non-passive wheel listener so we can call preventDefault
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.1 : -0.1;
-    setZoom((z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, parseFloat((z + delta).toFixed(2)))));
-  }, []);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
-
-  // Global mouse-move / mouse-up listeners for drag (attached once, use dragRef)
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!dragRef.current.active) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
-      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-        dragRef.current.moved = true;
-      }
-      setPan({ x: dragRef.current.initPanX + dx, y: dragRef.current.initPanY + dy });
-    };
-    const onUp = () => {
-      if (!dragRef.current.active) return;
-      dragRef.current.active = false;
-      setIsDragging(false);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-  }, []); // intentionally empty — uses dragRef and panRef
-
-  // Start a drag from the background (skip agent nodes and controls)
-  const handleContainerMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.smm-agent-node') || target.closest('.smm-zoom-controls')) return;
-    dragRef.current.active = true;
-    dragRef.current.startX = e.clientX;
-    dragRef.current.startY = e.clientY;
-    dragRef.current.initPanX = panRef.current.x;
-    dragRef.current.initPanY = panRef.current.y;
-    dragRef.current.moved = false;
-    setIsDragging(true);
-    e.preventDefault();
-  }, []);
-
-  // Layout math
-  const { w, h } = size;
-  const COLS = Math.min(MAX_COLS, nodes.length) || 1;
-  const ROWS = Math.ceil(nodes.length / COLS);
-
-  const coordX = w / 2;
-  const coordY = Math.max(COORD_R + 28, h * 0.16);
-
-  const agentAreaTop = coordY + COORD_R + 50;
-  const agentAreaH = h - agentAreaTop - 32;
-  const rowSpacing = nodes.length > 0 ? Math.max(100, agentAreaH / ROWS) : 100;
-  const colWidth = Math.min(170, (w - 60) / COLS);
-
-  const getAgentPos = (index: number) => {
-    const row = Math.floor(index / COLS);
-    const isLastRow = row === ROWS - 1;
-    const nodesInRow = isLastRow ? nodes.length - row * COLS : COLS;
-    const colInRow = index - row * COLS;
-    const rowTotalWidth = nodesInRow * colWidth;
-    const rowStartX = (w - rowTotalWidth) / 2;
-    const x = rowStartX + colInRow * colWidth + colWidth / 2;
-    const y = agentAreaTop + row * rowSpacing + AGENT_R;
-    return { x, y };
+  const coordinatorCenter = {
+    x: size.w / 2,
+    y: Math.max(COORDINATOR_HEIGHT / 2 + 18, Math.min(86, size.h * 0.18)),
   };
 
-  const agentRingSvgSize = AGENT_R * 2 + 16; // total SVG canvas for the ring
-  const agentNodeBoxSize = agentRingSvgSize;   // node div matches ring SVG
+  const normalizeCanvasPoint = useCallback((point: CanvasPoint): MindMapPosition => ({
+    x: point.x / size.w,
+    y: point.y / size.h,
+  }), [size.h, size.w]);
 
-  const viewportTransform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+  const denormalizeCanvasPoint = useCallback((point: MindMapPosition): CanvasPoint => ({
+    x: point.x * size.w,
+    y: point.y * size.h,
+  }), [size.h, size.w]);
+
+  const getCanvasPointFromClient = useCallback((clientX: number, clientY: number): CanvasPoint | null => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+
+    return {
+      x: (clientX - rect.left - panRef.current.x) / zoomRef.current,
+      y: (clientY - rect.top - panRef.current.y) / zoomRef.current,
+    };
+  }, []);
+
+  const clampNodeCenter = useCallback((point: CanvasPoint): CanvasPoint => {
+    // Keep a thin sliver of the card visible so nodes can sit on the edge
+    // without getting lost entirely outside the canvas.
+    const minX = -NODE_WIDTH / 2 + NODE_VISIBLE_EDGE_X;
+    const maxX = Math.max(minX, size.w + NODE_WIDTH / 2 - NODE_VISIBLE_EDGE_X);
+    const minY = -NODE_HEIGHT / 2 + NODE_VISIBLE_EDGE_Y;
+    const maxY = Math.max(minY, size.h + NODE_HEIGHT / 2 - NODE_VISIBLE_EDGE_Y);
+
+    return {
+      x: clamp(point.x, minX, maxX),
+      y: clamp(point.y, minY, maxY),
+    };
+  }, [size.h, size.w]);
+
+  const getDroppedRole = useCallback((dataTransfer: DataTransfer): string => {
+    const candidates = [
+      dragDataKey ? dataTransfer.getData(dragDataKey) : '',
+      dataTransfer.getData('text/plain'),
+      dataTransfer.getData('text'),
+      dataTransfer.getData('public.utf8-plain-text'),
+      dataTransfer.getData('public.text'),
+    ];
+
+    return candidates
+      .map((value) => value.trim().toLowerCase())
+      .find((value) => value === 'scout' || value === 'builder' || value === 'reviewer') || '';
+  }, [dragDataKey]);
+
+  const isRoleDrag = useCallback((dataTransfer: DataTransfer): boolean => {
+    const types = Array.from(dataTransfer.types || []);
+    return types.includes(dragDataKey || '')
+      || types.includes('text/plain')
+      || types.includes('text')
+      || types.includes('public.utf8-plain-text')
+      || types.includes('public.text');
+  }, [dragDataKey]);
+
+  const zoomAtPoint = useCallback((nextZoom: number, clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const canvasX = (clientX - rect.left - panRef.current.x) / zoomRef.current;
+    const canvasY = (clientY - rect.top - panRef.current.y) / zoomRef.current;
+
+    setZoom(nextZoom);
+    setPan({
+      x: clientX - rect.left - canvasX * nextZoom,
+      y: clientY - rect.top - canvasY * nextZoom,
+    });
+  }, []);
+
+  const handleWheel = useCallback((event: WheelEvent) => {
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.12 : 0.9;
+    const nextZoom = clamp(Number((zoomRef.current * factor).toFixed(2)), MIN_ZOOM, MAX_ZOOM);
+    zoomAtPoint(nextZoom, event.clientX, event.clientY);
+  }, [zoomAtPoint]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
+  const resolvedNodes: ResolvedMindMapNode[] = nodes.map((node, index) => {
+    const center = denormalizeCanvasPoint(node.position || buildDefaultMindMapPosition(index, nodes.length));
+    return {
+      ...node,
+      center,
+      roleColor: ROLE_COLORS[node.role] ?? '#6B7280',
+      statusColor: TONE_COLORS[node.tone],
+    };
+  });
+
+  const nodesById = new Map(resolvedNodes.map((node) => [node.id, node]));
+  const incomingNodeIds = new Set(connections.map((connection) => connection.to));
+  const rootNodes = resolvedNodes.filter((node) => !incomingNodeIds.has(node.id));
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const interaction = interactionRef.current;
+      if (interaction.mode === 'idle') return;
+      if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
+
+      const deltaX = event.clientX - interaction.startClientX;
+      const deltaY = event.clientY - interaction.startClientY;
+      if (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD) {
+        interaction.moved = true;
+      }
+
+      if (interaction.mode === 'pan') {
+        setPan({
+          x: interaction.initialPanX + deltaX,
+          y: interaction.initialPanY + deltaY,
+        });
+        return;
+      }
+
+      const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
+      if (!canvasPoint) return;
+
+      if (interaction.mode === 'node' && interaction.nodeId) {
+        const nextCenter = clampNodeCenter({
+          x: canvasPoint.x - (interaction.nodeOffsetX || 0),
+          y: canvasPoint.y - (interaction.nodeOffsetY || 0),
+        });
+        onNodeMove?.(interaction.nodeId, normalizeCanvasPoint(nextCenter));
+        return;
+      }
+
+      if (interaction.mode === 'connect' && interaction.fromNodeId) {
+        setConnectionPreview({
+          fromNodeId: interaction.fromNodeId,
+          point: canvasPoint,
+        });
+      }
+    };
+
+    const finishInteraction = (event: PointerEvent) => {
+      const interaction = interactionRef.current;
+      if (interaction.mode === 'idle') return;
+      if (interaction.pointerId !== null && interaction.pointerId !== event.pointerId) return;
+
+      if (interaction.mode === 'connect' && interaction.fromNodeId) {
+        const targetElement = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+        const targetNode = targetElement?.closest('[data-smm-node-id]') as HTMLElement | null;
+        const targetNodeId = targetNode?.dataset.smmNodeId;
+
+        if (targetNodeId && targetNodeId !== interaction.fromNodeId) {
+          onConnect?.(interaction.fromNodeId, targetNodeId);
+        }
+      }
+
+      if (interaction.mode === 'node' && interaction.nodeId && interaction.moved) {
+        suppressClickRef.current = interaction.nodeId;
+      }
+
+      interactionRef.current = {
+        mode: 'idle',
+        pointerId: null,
+        startClientX: 0,
+        startClientY: 0,
+        initialPanX: 0,
+        initialPanY: 0,
+        moved: false,
+      };
+      setIsPanning(false);
+      setConnectionPreview(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finishInteraction);
+    window.addEventListener('pointercancel', finishInteraction);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finishInteraction);
+      window.removeEventListener('pointercancel', finishInteraction);
+    };
+  }, [clampNodeCenter, getCanvasPointFromClient, normalizeCanvasPoint, onConnect, onNodeMove]);
+
+  const startBackgroundPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    if (
+      target.closest('.smm-agent-node') ||
+      target.closest('.smm-zoom-controls') ||
+      target.closest('.smm-link-line')
+    ) {
+      return;
+    }
+
+    interactionRef.current = {
+      mode: 'pan',
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialPanX: panRef.current.x,
+      initialPanY: panRef.current.y,
+      moved: false,
+    };
+    setIsPanning(true);
+    event.preventDefault();
+  }, []);
+
+  const startNodeDrag = useCallback((event: React.PointerEvent<HTMLDivElement>, node: ResolvedMindMapNode) => {
+    if (event.button !== 0) return;
+
+    const target = event.target as HTMLElement;
+    if (target.closest('.smm-node-port')) return;
+
+    const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
+    if (!canvasPoint) return;
+
+    interactionRef.current = {
+      mode: 'node',
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialPanX: panRef.current.x,
+      initialPanY: panRef.current.y,
+      nodeId: node.id,
+      nodeOffsetX: canvasPoint.x - node.center.x,
+      nodeOffsetY: canvasPoint.y - node.center.y,
+      moved: false,
+    };
+    event.preventDefault();
+    event.stopPropagation();
+  }, [getCanvasPointFromClient]);
+
+  const startConnectionDrag = useCallback((event: React.PointerEvent<HTMLButtonElement>, nodeId: string) => {
+    if (event.button !== 0) return;
+
+    const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
+    if (!canvasPoint) return;
+
+    interactionRef.current = {
+      mode: 'connect',
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialPanX: panRef.current.x,
+      initialPanY: panRef.current.y,
+      fromNodeId: nodeId,
+      moved: true,
+    };
+    setConnectionPreview({
+      fromNodeId: nodeId,
+      point: canvasPoint,
+    });
+    event.preventDefault();
+    event.stopPropagation();
+  }, [getCanvasPointFromClient]);
+
+  const handleRoleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragDataKey || !onDropRole) return;
+
+    if (isRoleDrag(event.dataTransfer)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      setIsDropActive(true);
+    }
+  }, [dragDataKey, isRoleDrag, onDropRole]);
+
+  const handleRoleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    const relatedTarget = event.relatedTarget as Node | null;
+    if (!relatedTarget || !event.currentTarget.contains(relatedTarget)) {
+      setIsDropActive(false);
+    }
+  }, []);
+
+  const handleRoleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragDataKey || !onDropRole) return;
+
+    const role = getDroppedRole(event.dataTransfer);
+    if (!role) return;
+
+    event.preventDefault();
+    setIsDropActive(false);
+
+    const canvasPoint = getCanvasPointFromClient(event.clientX, event.clientY);
+    if (!canvasPoint) return;
+
+    onDropRole(role, normalizeCanvasPoint(clampNodeCenter(canvasPoint)));
+  }, [clampNodeCenter, dragDataKey, getCanvasPointFromClient, getDroppedRole, normalizeCanvasPoint, onDropRole]);
+
+  const handleZoomButton = useCallback((direction: 'in' | 'out' | 'reset') => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    if (direction === 'reset') {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+      return;
+    }
+
+    const factor = direction === 'in' ? 1.15 : 0.87;
+    const nextZoom = clamp(Number((zoomRef.current * factor).toFixed(2)), MIN_ZOOM, MAX_ZOOM);
+    zoomAtPoint(nextZoom, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }, [zoomAtPoint]);
 
   return (
     <div
       ref={containerRef}
-      className={`swarm-mindmap${isDragging ? ' smm-dragging' : ''}`}
-      onMouseDown={handleContainerMouseDown}
+      className={`swarm-mindmap${isPanning ? ' smm-dragging' : ''}`}
+      onPointerDown={startBackgroundPan}
+      onDragOver={handleRoleDragOver}
+      onDragLeave={handleRoleDragLeave}
+      onDrop={handleRoleDrop}
     >
-      {/* Zoom / reset controls */}
       <div className="smm-zoom-controls">
         <button
+          type="button"
           className="smm-zoom-btn"
-          onClick={() => setZoom((z) => Math.min(MAX_ZOOM, parseFloat((z + 0.15).toFixed(2))))}
+          onClick={() => handleZoomButton('in')}
           title="Zoom in"
-        >+</button>
+        >
+          +
+        </button>
         <span className="smm-zoom-label">{Math.round(zoom * 100)}%</span>
         <button
+          type="button"
           className="smm-zoom-btn"
-          onClick={() => setZoom((z) => Math.max(MIN_ZOOM, parseFloat((z - 0.15).toFixed(2))))}
+          onClick={() => handleZoomButton('out')}
           title="Zoom out"
-        >−</button>
+        >
+          −
+        </button>
         <button
+          type="button"
           className="smm-zoom-btn"
-          onClick={() => { setZoom(1.0); setPan({ x: 0, y: 0 }); }}
+          onClick={() => handleZoomButton('reset')}
           title="Reset view"
-        >⌂</button>
+        >
+          ⌂
+        </button>
       </div>
 
-      {/* Zoomable + pannable viewport */}
       <div
         className="smm-viewport"
-        style={{ transform: viewportTransform, transformOrigin: 'center center' }}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}
       >
-        {/* Dot-grid background */}
-        <svg className="smm-bg" width={w} height={h} aria-hidden="true">
+        <svg className="smm-bg" width={size.w} height={size.h} aria-hidden="true">
           <defs>
-            <pattern id="smm-dot-grid" width="22" height="22" patternUnits="userSpaceOnUse">
-              <circle cx="1" cy="1" r="1" fill="currentColor" />
+            <pattern id="smm-dot-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <circle cx="1.25" cy="1.25" r="1.25" fill="currentColor" />
             </pattern>
           </defs>
-          <rect width={w} height={h} fill="url(#smm-dot-grid)" />
+          <rect width={size.w} height={size.h} fill="url(#smm-dot-grid)" />
         </svg>
 
-        {/* Wires + animated pulses */}
-        <svg className="smm-wires" width={w} height={h} aria-hidden="true">
+        <svg className="smm-wires" width={size.w} height={size.h} aria-hidden="true">
           <defs>
-            {nodes.map((node, i) => {
-              const { x: ax, y: ay } = getAgentPos(i);
-              const midY = (coordY + ay) / 2;
-              const d = `M ${coordX},${coordY + COORD_R} C ${coordX},${midY} ${ax},${midY} ${ax},${ay - AGENT_R}`;
-              return <path key={`wire-def-${node.id}`} id={`smm-wire-${i}`} d={d} fill="none" />;
-            })}
+            <marker
+              id="smm-arrowhead"
+              markerWidth="10"
+              markerHeight="10"
+              refX="8"
+              refY="5"
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+            </marker>
           </defs>
 
-          {nodes.map((node, i) => {
-            const { x: ax, y: ay } = getAgentPos(i);
-            const midY = (coordY + ay) / 2;
-            const d = `M ${coordX},${coordY + COORD_R} C ${coordX},${midY} ${ax},${midY} ${ax},${ay - AGENT_R}`;
-            const isRunning = node.tone !== 'queued' && node.tone !== 'done' && node.tone !== 'blocked';
-            const wireColor = isRunning ? TONE_COLORS[node.tone] : 'var(--border-default)';
-            const isSelected = node.id === selectedNodeId;
-
+          {rootNodes.map((node) => {
+            const path = buildCurvePath(
+              { x: coordinatorCenter.x, y: coordinatorCenter.y + COORDINATOR_HEIGHT / 2 },
+              { x: node.center.x, y: node.center.y - NODE_HEIGHT / 2 },
+            );
             return (
-              <g key={`wire-${node.id}`}>
-                <path
-                  d={d}
-                  stroke={isSelected ? 'var(--accent-primary)' : wireColor}
-                  strokeWidth={isSelected ? 2.5 : isRunning ? 2 : 1.5}
-                  fill="none"
-                  strokeDasharray={isRunning || isSelected ? undefined : '5 5'}
-                  opacity={isRunning || isSelected ? 0.85 : 0.3}
-                />
-                {isRunning && (
-                  <circle r="4" fill={wireColor} opacity="0.95">
-                    <animateMotion dur="1.8s" repeatCount="indefinite">
-                      <mpath href={`#smm-wire-${i}`} />
-                    </animateMotion>
-                  </circle>
-                )}
-              </g>
+              <path
+                key={`root-${node.id}`}
+                d={path}
+                className="smm-root-link"
+                stroke={node.statusColor}
+                strokeWidth="1.4"
+                fill="none"
+                markerEnd="url(#smm-arrowhead)"
+              />
             );
           })}
-        </svg>
 
-        {/* Coordinator hexagon (SVG shape + text on the same layer) */}
-        <svg className="smm-hex-layer" width={w} height={h} aria-hidden="true">
-          {isActive && (
-            <path
-              d={hexPath(coordX, coordY, COORD_R + 10)}
-              fill="none"
-              stroke="var(--accent-primary)"
-              strokeWidth="1.5"
-            >
-              <animate attributeName="opacity" values="0.5;0;0.5" dur="2.2s" repeatCount="indefinite" />
-              <animate
-                attributeName="d"
-                values={`${hexPath(coordX, coordY, COORD_R + 6)};${hexPath(coordX, coordY, COORD_R + 14)};${hexPath(coordX, coordY, COORD_R + 6)}`}
-                dur="2.2s"
-                repeatCount="indefinite"
+          {connections.map((connection) => {
+            const fromNode = nodesById.get(connection.from);
+            const toNode = nodesById.get(connection.to);
+            if (!fromNode || !toNode) return null;
+
+            const isSelected = selectedNodeId === fromNode.id || selectedNodeId === toNode.id;
+            const path = buildCurvePath(
+              { x: fromNode.center.x + NODE_WIDTH / 2, y: fromNode.center.y },
+              { x: toNode.center.x - NODE_WIDTH / 2, y: toNode.center.y },
+            );
+
+            return (
+              <path
+                key={`${connection.from}-${connection.to}`}
+                d={path}
+                className={`smm-link-line${connection.kind === 'manual' ? ' smm-link-manual' : ' smm-link-automatic'}${isSelected ? ' smm-link-selected' : ''}`}
+                stroke={fromNode.statusColor}
+                strokeWidth={connection.kind === 'manual' ? 2.3 : 1.6}
+                fill="none"
+                markerEnd="url(#smm-arrowhead)"
+                strokeDasharray={connection.kind === 'manual' ? undefined : '8 6'}
+                onClick={
+                  connection.kind === 'manual' && onDisconnect
+                    ? (event) => {
+                        event.stopPropagation();
+                        onDisconnect(connection.from, connection.to);
+                      }
+                    : undefined
+                }
               />
-            </path>
-          )}
-          <path
-            d={hexPath(coordX, coordY, COORD_R)}
-            fill="var(--bg-secondary)"
-            stroke="var(--accent-primary)"
-            strokeWidth="2"
-          />
-          {/* Coordinator text rendered inside SVG so it clips to the hex region naturally */}
-          <text
-            x={coordX}
-            y={coordY - 7}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="smm-svg-title"
-          >
-            Coordinator
-          </text>
-          <text
-            x={coordX}
-            y={coordY + 9}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="smm-svg-sub"
-          >
-            {coordinatorStatus.length > 12 ? coordinatorStatus.slice(0, 11) + '…' : coordinatorStatus}
-          </text>
+            );
+          })}
+
+          {connectionPreview && (() => {
+            const fromNode = nodesById.get(connectionPreview.fromNodeId);
+            if (!fromNode) return null;
+
+            const path = buildCurvePath(
+              { x: fromNode.center.x + NODE_WIDTH / 2, y: fromNode.center.y },
+              connectionPreview.point,
+            );
+
+            return (
+              <path
+                d={path}
+                className="smm-link-preview"
+                stroke={fromNode.statusColor}
+                strokeWidth="2.4"
+                fill="none"
+              />
+            );
+          })()}
         </svg>
 
-        {/* Agent nodes */}
-        {nodes.map((node, i) => {
-          const { x, y } = getAgentPos(i);
-          const roleColor = ROLE_COLORS[node.role] ?? '#6B7280';
-          const statusColor = TONE_COLORS[node.tone];
-          const isRunning = node.tone !== 'queued' && node.tone !== 'done' && node.tone !== 'blocked';
+        <div
+          className={`smm-node smm-coordinator-node${isActive ? ' smm-active' : ''}`}
+          style={{
+            left: coordinatorCenter.x,
+            top: coordinatorCenter.y,
+            width: COORDINATOR_WIDTH,
+            height: COORDINATOR_HEIGHT,
+          }}
+        >
+          <div className="smm-coordinator-card">
+            <span className="smm-coordinator-label">Coordinator</span>
+            <strong>Swarm control lane</strong>
+            <span className="smm-coordinator-status">
+              {truncateText(coordinatorStatus || 'Idle', 24)}
+            </span>
+          </div>
+        </div>
+
+        {resolvedNodes.map((node) => {
           const isSelected = node.id === selectedNodeId;
-          const ringR = AGENT_R + 4;
-          const svgCenter = AGENT_R + 8;
+          const isRunning = node.tone !== 'queued' && node.tone !== 'done' && node.tone !== 'blocked';
+          const title = node.workingOn
+            ? `${node.label}: ${node.workingOn}`
+            : node.label;
 
           return (
             <div
               key={node.id}
+              data-smm-node-id={node.id}
               className={`smm-node smm-agent-node${isRunning ? ' smm-running' : ''}${isSelected ? ' smm-selected' : ''}`}
               style={{
-                left: x,
-                top: y,
-                width: agentNodeBoxSize,
-                height: agentNodeBoxSize,
-                '--role-color': roleColor,
-                '--status-color': statusColor,
+                left: node.center.x,
+                top: node.center.y,
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT,
+                '--role-color': node.roleColor,
+                '--status-color': node.statusColor,
               } as React.CSSProperties}
+              onPointerDown={(event) => startNodeDrag(event, node)}
               onClick={() => {
-                if (dragRef.current.moved) return; // suppress click after drag
+                if (suppressClickRef.current === node.id) {
+                  suppressClickRef.current = null;
+                  return;
+                }
                 onAgentClick?.(node.id);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onAgentClick?.(node.id);
+                }
               }}
               role={onAgentClick ? 'button' : undefined}
               tabIndex={onAgentClick ? 0 : undefined}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onAgentClick?.(node.id); }}
-              title={onAgentClick ? `Message ${node.label}` : undefined}
+              title={title}
             >
-              {/* Ring SVG */}
-              <svg
-                className="smm-agent-ring-svg"
-                width={agentRingSvgSize}
-                height={agentRingSvgSize}
-                aria-hidden="true"
-              >
-                <circle
-                  cx={svgCenter}
-                  cy={svgCenter}
-                  r={ringR}
-                  fill="var(--bg-primary)"
-                  stroke={isSelected ? 'var(--accent-primary)' : roleColor}
-                  strokeWidth={isSelected ? 3 : 2}
-                />
-                {isRunning && !isSelected && (
-                  <circle cx={svgCenter} cy={svgCenter} r={ringR} fill="none" stroke={statusColor} strokeWidth="1.5">
-                    <animate attributeName="opacity" values="0.6;0;0.6" dur="1.8s" repeatCount="indefinite" />
-                    <animate attributeName="r" values={`${ringR};${ringR + 7};${ringR}`} dur="1.8s" repeatCount="indefinite" />
-                  </circle>
-                )}
-                {/* Label text rendered inside SVG so it stays within the circle */}
-                <text
-                  x={svgCenter}
-                  y={svgCenter - 7}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="smm-svg-title"
-                >
-                  {node.label.length > 9 ? node.label.slice(0, 8) + '…' : node.label}
-                </text>
-                <text
-                  x={svgCenter}
-                  y={svgCenter + 9}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="smm-svg-role"
-                  style={{ fill: roleColor }}
-                >
-                  {node.role}
-                </text>
-              </svg>
-              {/* Status badge below the circle */}
-              <span className="smm-node-badge" style={{ background: statusColor }}>
-                {node.tone.toUpperCase()}
-              </span>
+              <span className="smm-node-port smm-node-port-in" aria-hidden="true" />
+              <button
+                type="button"
+                className="smm-node-port smm-node-port-out"
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => startConnectionDrag(event, node.id)}
+                title={`Connect ${node.label}`}
+                aria-label={`Connect ${node.label}`}
+              />
+
+              <div className="smm-agent-card-shell">
+                <div className="smm-agent-node-head">
+                  <span className="smm-agent-node-role">{node.role}</span>
+                  <span className="smm-node-badge" style={{ background: node.statusColor }}>
+                    {node.statusLabel || formatTone(node.tone)}
+                  </span>
+                </div>
+
+                <strong className="smm-agent-node-title">{truncateText(node.label, 24)}</strong>
+                <span className="smm-agent-node-caption">Working on</span>
+                <span className="smm-agent-node-work">
+                  {truncateText(node.workingOn || 'Awaiting launch', 32)}
+                </span>
+              </div>
             </div>
           );
         })}
 
-        {/* Empty state */}
         {nodes.length === 0 && (
           <div className="smm-empty">
-            <svg width="40" height="46" viewBox="0 0 40 46" fill="none" aria-hidden="true">
-              <path
-                d={hexPath(20, 23, 18)}
-                stroke="var(--border-default)"
-                strokeWidth="2"
-                fill="none"
-              />
-            </svg>
-            <span>Graph appears when swarm launches</span>
+            <div className="smm-empty-glyph">⬡</div>
+            <span>Drag roles into the map to place agents before launch.</span>
           </div>
         )}
-      </div>{/* /smm-viewport */}
+      </div>
+
+      {isDropActive && (
+        <div className="smm-drop-overlay" aria-hidden="true">
+          <span className="smm-drop-overlay-label">Drop to place agent</span>
+        </div>
+      )}
     </div>
   );
 };

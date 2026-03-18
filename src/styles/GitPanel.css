@@ -454,13 +454,13 @@
 }
 
 .git-op-success {
-  color: #3fb950;
-  background: rgba(63, 185, 80, 0.08);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .git-op-error {
   color: var(--accent-red);
-  background: rgba(255, 107, 107, 0.08);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
 }
 
 .git-op-loading {
@@ -524,7 +524,7 @@
   font-size: 11px;
   color: var(--accent-red);
   font-family: var(--font-mono);
-  background: rgba(255, 107, 107, 0.1);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
   padding: 8px 12px;
   border-radius: 6px;
   display: inline-block;
@@ -591,7 +591,7 @@
 }
 
 .status-added {
-  color: #3fb950;
+  color: var(--accent-primary);
 }
 
 .status-deleted {
@@ -763,16 +763,16 @@
 /* Semantic diff colors */
 .split-diff-cell.left.removed,
 .split-diff-cell.left.modified {
-  border: 1px solid rgba(255, 107, 107, 0.35);
-  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid color-mix(in srgb, var(--accent-red) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-red) 10%, transparent);
   color: var(--accent-red);
 }
 
 .split-diff-cell.right.added,
 .split-diff-cell.right.modified {
-  border: 1px solid rgba(63, 185, 80, 0.35);
-  background: rgba(63, 185, 80, 0.1);
-  color: #3fb950;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
 }
 
 .split-diff-cell.left.added,
@@ -796,12 +796,12 @@
 
 /* Semantic diff line colors */
 .diff-added {
-  background: rgba(63, 185, 80, 0.15);
-  color: #3fb950;
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
 }
 
 .diff-removed {
-  background: rgba(255, 107, 107, 0.15);
+  background: color-mix(in srgb, var(--accent-red) 15%, transparent);
   color: var(--accent-red);
 }
 

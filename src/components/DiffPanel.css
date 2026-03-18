@@ -148,13 +148,12 @@
   font-weight: 700;
 }
 
-/* Keep semantic green/red for diff stats */
 .review-file-stats .add {
-  color: #16a34a;
+  color: var(--text-primary);
 }
 
 .review-file-stats .remove {
-  color: #dc2626;
+  color: var(--text-muted);
 }
 
 .review-revert-file {
@@ -231,25 +230,16 @@
   opacity: 0.86;
 }
 
-/* Semantic green/red for added/removed diff lines */
 .review-diff-line.added {
-  background: rgba(22, 163, 74, 0.1);
-  border-left: 3px solid rgba(22, 163, 74, 0.8);
-  color: #16a34a;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--text-primary) 45%, transparent);
+  color: var(--text-primary);
 }
 
 .review-diff-line.removed {
-  background: rgba(220, 38, 38, 0.1);
-  border-left: 3px solid rgba(220, 38, 38, 0.8);
-  color: #dc2626;
-}
-
-.app.dark .review-diff-line.added {
-  color: #86efac;
-}
-
-.app.dark .review-diff-line.removed {
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--text-muted) 50%, transparent);
+  color: var(--text-secondary);
 }
 
 .review-footer-actions {
@@ -277,23 +267,18 @@
 }
 
 .review-footer-btn.revert:hover {
-  border-color: var(--accent-red);
-  color: var(--accent-red);
+  border-color: var(--text-primary);
+  color: var(--text-primary);
 }
 
-/* Keep semantic green for keep/accept */
 .review-footer-btn.keep {
-  background: rgba(22, 163, 74, 0.15);
-  color: #16a34a;
-  border-color: rgba(22, 163, 74, 0.4);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-primary) 28%, transparent);
 }
 
 .review-footer-btn.keep:hover {
-  background: rgba(22, 163, 74, 0.25);
-}
-
-.app.dark .review-footer-btn.keep {
-  color: #86efac;
+  background: color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
 .review-sidebar {

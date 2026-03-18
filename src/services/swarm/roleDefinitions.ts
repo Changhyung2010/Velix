@@ -290,19 +290,19 @@ export function getRoleName(type: AgentRoleType): string {
  */
 export function getRoleColor(type: AgentRoleType): string {
   const colors: Record<AgentRoleType, string> = {
-    scout: '#0F766E',
-    planner: '#0A8080',     // Teal (primary)
-    architect: '#065A5A',    // Dark Teal
-    frontend: '#0F8B8D',
-    backend: '#16697A',
-    builder: '#2563EB',
-    security: '#D97706',
-    qa: '#3B82F6',
-    implementer: '#14A0A0', // Light Teal
-    tester: '#FFD93D',      // Yellow
-    refactorer: '#0A8080',  // Teal
-    reviewer: '#B45309',
-    docwriter: '#808080',   // Gray (for documentation)
+    scout: 'var(--text-muted)',
+    planner: 'var(--text-secondary)',
+    architect: 'var(--accent-primary-dark)',
+    frontend: 'var(--text-secondary)',
+    backend: 'var(--text-primary)',
+    builder: 'var(--accent-primary)',
+    security: 'var(--text-hint)',
+    qa: 'var(--border-default)',
+    implementer: 'var(--text-muted)',
+    tester: 'var(--text-hint)',
+    refactorer: 'var(--text-secondary)',
+    reviewer: 'var(--accent-primary-dark)',
+    docwriter: 'var(--text-muted)',
   };
   return colors[type];
 }

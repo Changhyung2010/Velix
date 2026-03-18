@@ -437,7 +437,7 @@ export class ClaudeCoordinator {
 
   async createSyncResult(
     goal: string,
-    workspacePath: string,
+    _workspacePath: string,
     plan: CoordinatorPlan,
     agents: Agent[],
   ): Promise<CoordinatorSyncResult> {

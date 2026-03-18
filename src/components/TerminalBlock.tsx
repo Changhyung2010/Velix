@@ -65,78 +65,6 @@ declare global {
     webkitSpeechRecognition: new () => SpeechRecognition;
   }
 }
-// ─── Terminal Markdown Renderer ────────────────────────────────────────────
-// Converts a single markdown line to ANSI-formatted terminal text.
-// Handles: headings (# / ## / ###), **bold**, `code`, - / * bullets, ---
-// ─────────────────────────────────────────────────────────────────────────────
-function renderMarkdownLine(line: string): string {
-  const RESET = '\x1b[0m';
-  const BOLD = '\x1b[1m';
-  const DIM = '\x1b[2m';
-  const CYAN = '\x1b[38;5;39m';   // same teal used for the AI border
-  const YELLOW = '\x1b[38;5;220m';  // h2 / h3
-  const WHITE = '\x1b[97m';
-
-  // --- headings ---
-  if (/^#{4,}\s/.test(line)) {
-    const text = line.replace(/^#{4,}\s*/, '');
-    return `    ${BOLD}${DIM}${renderInline(text)}${RESET}`;
-  }
-  if (/^###\s/.test(line)) {
-    const text = line.replace(/^###\s*/, '');
-    return `   ${BOLD}${YELLOW}${renderInline(text)}${RESET}`;
-  }
-  if (/^##\s/.test(line)) {
-    const text = line.replace(/^##\s*/, '');
-    return `  ${BOLD}${CYAN}${renderInline(text)}${RESET}`;
-  }
-  if (/^#\s/.test(line)) {
-    const text = line.replace(/^#\s*/, '');
-    return `${BOLD}${WHITE}${renderInline(text)}${RESET}`;
-  }
-
-  // --- horizontal rule ---
-  if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
-    return `${DIM}${'─'.repeat(48)}${RESET}`;
-  }
-
-  // --- unordered bullets (- item  or  * item) ---
-  const bulletMatch = line.match(/^(\s*)[-*]\s+(.*)/);
-  if (bulletMatch) {
-    const indent = bulletMatch[1] || '';
-    const text = bulletMatch[2];
-    return `${indent}  ${CYAN}•${RESET} ${renderInline(text)}`;
-  }
-
-  // --- numbered list (1. item) ---
-  const numMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/)
-  if (numMatch) {
-    const indent = numMatch[1] || '';
-    const num = numMatch[2];
-    const text = numMatch[3];
-    return `${indent}  ${CYAN}${num}.${RESET} ${renderInline(text)}`;
-  }
-
-  // --- regular line: apply inline styles ---
-  return renderInline(line);
-}
-
-/** Apply inline markdown: **bold**, *italic*, `code` */
-function renderInline(text: string): string {
-  const RESET = '\x1b[0m';
-  const BOLD = '\x1b[1m';
-  const ITALIC = '\x1b[3m';
-  const CODE_BG = '\x1b[38;5;108m';  // muted green for inline code
-
-  return text
-    // **bold** or __bold__
-    .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_, a, b) => `${BOLD}${a ?? b}${RESET}`)
-    // *italic* or _italic_ (single, not double)
-    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, (_, a, b) => `${ITALIC}${a ?? b}${RESET}`)
-    // `inline code`
-    .replace(/`([^`]+)`/g, (_, code) => `${CODE_BG}${code}${RESET}`);
-}
-
 
 interface TerminalBlockProps {
   cwd?: string;
@@ -436,6 +364,7 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   const sessionIdRef = useRef<string>("");
   const unlistenOutputRef = useRef<UnlistenFn | null>(null);
   const unlistenExitRef = useRef<UnlistenFn | null>(null);
+  const promptKickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClaudeCodeRunningRef = useRef<boolean>(false);
 
   const [inputValue, setInputValue] = useState("");
@@ -499,6 +428,11 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
     const sessionId = generateSessionId();
     sessionIdRef.current = sessionId;
 
+    if (promptKickTimerRef.current) {
+      clearTimeout(promptKickTimerRef.current);
+      promptKickTimerRef.current = null;
+    }
+
     try {
       await invoke("pty_create", {
         sessionId,
@@ -506,6 +440,15 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
         cols,
         cwd: cwd || undefined,
       });
+
+      // Normalize the startup screen to one clean prompt line after shell boot.
+      promptKickTimerRef.current = setTimeout(() => {
+        if (sessionIdRef.current !== sessionId) return;
+        void invoke("pty_write", {
+          sessionId,
+          data: "clear\r",
+        }).catch(() => {});
+      }, 380);
       return sessionId;
     } catch (error) {
       console.error("Failed to create PTY session:", error);
@@ -570,55 +513,55 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Theme configurations — matched to the app's teal/forest design system
+    // Theme configuration — neutral grayscale palette aligned to the app shell
     const darkTheme = {
-      background: "#0C120C",            // --bg-terminal dark
-      foreground: "#D4D4D4",
-      cursor: "#0A8080",                // --accent-primary dark (teal)
-      cursorAccent: "#0C120C",
-      selectionBackground: "rgba(10, 128, 128, 0.28)",
-      selectionForeground: "#E8E8E8",
-      black: "#2A352A",
-      red: "#FF6B6B",                   // --accent-red dark
-      green: "#3FB950",
-      yellow: "#FFD93D",                // --accent-yellow dark
-      blue: "#0A8080",                  // teal for blue
-      magenta: "#9D7CD8",
-      cyan: "#14A0A0",                  // --accent-primary-light dark
-      white: "#B0B0B0",                 // --text-secondary dark
-      brightBlack: "#808080",           // --text-muted dark
-      brightRed: "#FF9090",
-      brightGreen: "#56D364",
-      brightYellow: "#FFE066",
-      brightBlue: "#14A0A0",
-      brightMagenta: "#C099FF",
-      brightCyan: "#1ABCAA",
-      brightWhite: "#E8E8E8",           // --text-primary dark
+      background: "#0f1012",
+      foreground: "#f3f4f6",
+      cursor: "#f2f2f3",
+      cursorAccent: "#0f1012",
+      selectionBackground: "rgba(255, 255, 255, 0.14)",
+      selectionForeground: "#ffffff",
+      black: "#17181b",
+      red: "#8e919a",
+      green: "#cfd1d7",
+      yellow: "#b8bac1",
+      blue: "#f2f2f3",
+      magenta: "#d6d7dc",
+      cyan: "#b8bac1",
+      white: "#cfd1d7",
+      brightBlack: "#676a73",
+      brightRed: "#d6d7dc",
+      brightGreen: "#ffffff",
+      brightYellow: "#e5e7eb",
+      brightBlue: "#ffffff",
+      brightMagenta: "#e5e7eb",
+      brightCyan: "#d6d7dc",
+      brightWhite: "#ffffff",
     };
 
     const lightTheme = {
-      background: "#F5F5F0",            // --bg-terminal light
-      foreground: "#1A1A1A",
-      cursor: "#065E5E",                // --accent-primary light (teal)
-      cursorAccent: "#F5F5F0",
-      selectionBackground: "rgba(6, 94, 94, 0.18)",
-      selectionForeground: "#0C120C",
-      black: "#0C120C",
-      red: "#DC2626",                   // --accent-red light
-      green: "#116329",
-      yellow: "#CA8A04",                // --accent-yellow light
-      blue: "#065E5E",                  // teal for blue
-      magenta: "#8250DF",
-      cyan: "#088080",                  // --accent-cyan light
-      white: "#3D3D3D",                 // --text-secondary light
-      brightBlack: "#5A5A5A",           // --text-muted light
-      brightRed: "#A40E26",
-      brightGreen: "#1A7F37",
-      brightYellow: "#633C01",
-      brightBlue: "#088080",
-      brightMagenta: "#A475F9",
-      brightCyan: "#047A7A",
-      brightWhite: "#0C120C",
+      background: "#f5f5f7",
+      foreground: "#101114",
+      cursor: "#111111",
+      cursorAccent: "#f5f5f7",
+      selectionBackground: "rgba(17, 17, 17, 0.14)",
+      selectionForeground: "#050506",
+      black: "#101114",
+      red: "#3a3c42",
+      green: "#2d2e34",
+      yellow: "#4d4f58",
+      blue: "#111111",
+      magenta: "#696b74",
+      cyan: "#545660",
+      white: "#6c6f78",
+      brightBlack: "#91939c",
+      brightRed: "#545660",
+      brightGreen: "#111111",
+      brightYellow: "#2d2e34",
+      brightBlue: "#050506",
+      brightMagenta: "#3a3c42",
+      brightCyan: "#2d2e34",
+      brightWhite: "#050506",
     };
 
     // Create terminal instance
@@ -679,6 +622,10 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
       // Listen for PTY exit
       unlistenExitRef.current = await listen<PtyExit>("pty-exit", (event) => {
         if (event.payload.session_id === sessionIdRef.current) {
+          if (promptKickTimerRef.current) {
+            clearTimeout(promptKickTimerRef.current);
+            promptKickTimerRef.current = null;
+          }
           term.writeln("\r\n\x1b[90m[Process exited]\x1b[0m");
           // Reset Claude Code state so input card is always visible after session restart
           isClaudeCodeRunningRef.current = false;
@@ -742,6 +689,11 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
       }
       if (unlistenExitRef.current) {
         unlistenExitRef.current();
+      }
+
+      if (promptKickTimerRef.current) {
+        clearTimeout(promptKickTimerRef.current);
+        promptKickTimerRef.current = null;
       }
 
       killPtySession();
@@ -910,13 +862,8 @@ ${npmScripts.length > 0 ? `Available npm scripts: ${npmScripts.join(', ')}.` : '
       : Object.keys(projectFileContents);
     const hasProjectContents = projectContentKeys.length > 0;
     const projectName = projectDir?.split('/').pop() || 'project';
-    const fileCount = hasWorkspaceCtx ? wsContext.totalLoadedFiles : projectContentKeys.length;
-    const totalFileCount = hasWorkspaceCtx ? wsContext.totalFiles : projectFileList.length;
 
     // Add user message to chat panel
-    const contextLabel = hasProjectContents
-      ? `${projectName} · ${fileCount}/${totalFileCount} files`
-      : undefined;
     setAiChatMessages(prev => [
       ...prev,
       { id: `user-${Date.now()}`, role: 'user', content: prompt },

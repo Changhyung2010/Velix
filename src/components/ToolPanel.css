@@ -115,8 +115,8 @@
 .tp-error-msg {
     padding: 8px 12px;
     margin: 8px 12px 0;
-    background: rgba(255, 107, 107, 0.08);
-    border: 1px solid rgba(255, 107, 107, 0.25);
+    background: color-mix(in srgb, var(--accent-red) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-red) 25%, transparent);
     border-radius: 6px;
     color: var(--accent-red);
     font-size: 12px;

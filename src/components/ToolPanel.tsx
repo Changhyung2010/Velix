@@ -190,33 +190,36 @@ export function ToolPanel({ filePath, fileContent, projectDir, onClose }: ToolPa
         if (total === 0) return null;
 
         const sorted = Object.entries(languages).sort((a, b) => b[1] - a[1]).slice(0, 8);
-        const colors: Record<string, string> = {
-            TypeScript: '#3178c6', JavaScript: '#f1e05a', Python: '#3572A5',
-            Rust: '#dea584', Go: '#00ADD8', Java: '#b07219', 'C++': '#f34b7d',
-            C: '#555555', Ruby: '#701516', PHP: '#4F5D95', Swift: '#F05138',
-            Kotlin: '#A97BFF', CSS: '#563d7c', HTML: '#e34c26', Shell: '#89e051',
-            Dart: '#00B4AB', Scala: '#c22d40',
-        };
+        const colors = [
+            'var(--text-primary)',
+            'var(--text-secondary)',
+            'var(--text-muted)',
+            'var(--border-default)',
+            'var(--text-hint)',
+            'var(--accent-primary)',
+            'var(--accent-primary-dark)',
+            'var(--accent-primary-light)',
+        ];
 
         return (
             <div className="tp-languages">
                 <div className="tp-lang-bar">
-                    {sorted.map(([lang, bytes]) => (
+                    {sorted.map(([lang, bytes], index) => (
                         <div
                             key={lang}
                             className="tp-lang-segment"
                             style={{
                                 width: `${(bytes / total) * 100}%`,
-                                backgroundColor: colors[lang] || '#8b949e',
+                                backgroundColor: colors[index % colors.length],
                             }}
                             title={`${lang}: ${((bytes / total) * 100).toFixed(1)}%`}
                         />
                     ))}
                 </div>
                 <div className="tp-lang-legend">
-                    {sorted.map(([lang, bytes]) => (
+                    {sorted.map(([lang, bytes], index) => (
                         <div key={lang} className="tp-lang-item">
-                            <span className="tp-lang-dot" style={{ backgroundColor: colors[lang] || '#8b949e' }} />
+                            <span className="tp-lang-dot" style={{ backgroundColor: colors[index % colors.length] }} />
                             <span className="tp-lang-name">{lang}</span>
                             <span className="tp-lang-pct">{((bytes / total) * 100).toFixed(1)}%</span>
                         </div>
