@@ -27,15 +27,29 @@ interface PTYExit {
 
 
 const MAX_OUTPUT_BUFFER = 500; // Lines to keep in memory per agent
+const MAX_TERMINAL_OUTPUT_CHARS = 250_000; // Raw PTY chars to keep for terminal replay
 
-// Patterns that indicate a CLI is showing its input prompt and ready for a message
+// Minimum time (ms) after sending the CLI launch command before we start checking for readiness.
+// This prevents false-positive matches on shell output before the CLI actually starts.
+const CLI_MIN_STARTUP_MS = 4000;
+
+// Fallback timer (ms) — if ready pattern never fires, deliver the prompt after this delay.
+// Must be long enough for the slowest CLI to start (Claude Code can take 8-12 s).
+const CLI_FALLBACK_TIMEOUT_MS = 20000;
+const READY_ACCUMULATOR_MAX_CHARS = 2000;
+
+// Patterns that indicate a CLI is showing its input prompt and ready for a message.
+// These are tested against the ACCUMULATED sanitized output (not individual chunks).
 const CLI_READY_PATTERNS = [
-  /^\s*>\s*$/m,          // Claude Code: bare ">"
-  /^\s*>\s+$/m,          // Claude Code: "> " with trailing space
-  /╭─+╮/,               // Claude Code welcome box top border
+  />\s*$/m,              // Claude Code: prompt ending with ">"
+  /╰─+╯/,               // Claude Code welcome box bottom border (appears just before prompt)
+  /Tips for getting started/i, // Claude Code startup tips
   /Type your message/i,  // Some versions show this hint
-  /\$\s*$/m,             // Fallback: shell prompt (Claude wasn't found, shell is ready)
+  /\?\s*$/m,             // Gemini-style "?" prompt
 ];
+
+const BRACKETED_PASTE_START = '\u001b[200~';
+const BRACKETED_PASTE_END = '\u001b[201~';
 
 const ANSI_ESCAPE_REGEX = /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])|\u009B[0-?]*[ -/]*[@-~]/g;
 
@@ -160,6 +174,10 @@ export class AgentManager {
   // Prompts waiting to be delivered once the CLI shows its ready indicator
   private pendingPrompts: Map<string, string> = new Map();
   private pendingPromptTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  // Accumulated sanitized output per agent (for ready-pattern matching)
+  private readyAccumulator: Map<string, string> = new Map();
+  // Timestamp when the CLI launch command was sent (to enforce minimum startup delay)
+  private cliLaunchedAt: Map<string, number> = new Map();
 
   constructor(eventEmitter: SwarmEventEmitter, workspacePath: string) {
     this.eventEmitter = eventEmitter;
@@ -183,7 +201,9 @@ export class AgentManager {
       const { session_id, data } = event.payload;
       const agent = this.findAgentBySessionId(session_id);
       if (agent) {
-        this.handleAgentOutput(agent.id, data);
+        void this.handleAgentOutput(agent.id, data).catch((error) => {
+          console.error('AgentManager: Error handling PTY output:', error);
+        });
       }
     });
 
@@ -214,6 +234,14 @@ export class AgentManager {
     }
     for (const unlisten of this.exitListeners.values()) {
       unlisten();
+    }
+    for (const agentId of new Set([
+      ...this.pendingPrompts.keys(),
+      ...this.pendingPromptTimers.keys(),
+      ...this.readyAccumulator.keys(),
+      ...this.cliLaunchedAt.keys(),
+    ])) {
+      this.clearPendingPromptState(agentId);
     }
     this.outputListeners.clear();
     this.exitListeners.clear();
@@ -246,16 +274,27 @@ export class AgentManager {
     if (!agent) return;
     const sanitizedData = sanitizeTerminalOutput(data);
 
-    // If the CLI hasn't received its first prompt yet, check whether it's ready
+    // If the CLI hasn't received its first prompt yet, accumulate output and check readiness
     if (this.pendingPrompts.has(agentId)) {
-      const isReady = CLI_READY_PATTERNS.some((pattern) => pattern.test(sanitizedData));
-      if (isReady) {
-        await this.deliverPendingPrompt(agent);
+      const prev = this.readyAccumulator.get(agentId) || '';
+      // Keep only the tail of recent output to avoid unbounded growth.
+      const accumulated = (prev + sanitizedData).slice(-READY_ACCUMULATOR_MAX_CHARS);
+      this.readyAccumulator.set(agentId, accumulated);
+
+      // Only start checking after the minimum startup delay
+      const launchedAt = this.cliLaunchedAt.get(agentId) || 0;
+      if (Date.now() - launchedAt >= CLI_MIN_STARTUP_MS) {
+        const isReady = CLI_READY_PATTERNS.some((pattern) => pattern.test(accumulated));
+        if (isReady) {
+          console.log(`AgentManager: CLI ready detected for ${agentId} — delivering prompt`);
+          await this.deliverPendingPrompt(agent);
+        }
       }
     }
 
     // Update last activity
     agent.lastActivityAt = new Date();
+    agent.terminalOutput = (agent.terminalOutput + data).slice(-MAX_TERMINAL_OUTPUT_CHARS);
 
     // Add to output buffer
     const lines = sanitizedData
@@ -302,6 +341,7 @@ export class AgentManager {
   private handleAgentExit(agentId: string, exitCode: number | null): void {
     const agent = this.agents.get(agentId);
     if (!agent) return;
+    this.clearPendingPromptState(agentId);
 
     // Update status
     agent.status = exitCode === 0 ? 'completed' : 'failed';
@@ -382,6 +422,7 @@ export class AgentManager {
       startedAt: new Date(),
       lastActivityAt: new Date(),
       outputBuffer: [],
+      terminalOutput: '',
       metrics: {
         promptsProcessed: 0,
         filesModified: [],
@@ -395,18 +436,23 @@ export class AgentManager {
     this.agents.set(agentId, agent);
 
     // Step 1: open the CLI (e.g. `claude --dangerously-skip-permissions`)
+    this.cliLaunchedAt.set(agentId, Date.now());
+    this.readyAccumulator.set(agentId, '');
     await invoke('pty_write', {
       sessionId,
       data: startCommand,
     });
 
     // Step 2: store the prompt — it will be sent once the CLI shows its ready indicator.
-    // A fallback timer fires after 3 s in case the ready pattern isn't detected.
+    // A fallback timer fires after CLI_FALLBACK_TIMEOUT_MS in case the ready pattern isn't detected.
     this.pendingPrompts.set(agentId, prompt);
     const fallbackTimer = setTimeout(() => {
       const a = this.agents.get(agentId);
-      if (a) this.deliverPendingPrompt(a);
-    }, 3000);
+      if (a && this.pendingPrompts.has(agentId)) {
+        console.warn(`AgentManager: fallback timer fired for ${agentId} — delivering prompt without ready confirmation`);
+        void this.deliverPendingPrompt(a);
+      }
+    }, CLI_FALLBACK_TIMEOUT_MS);
     this.pendingPromptTimers.set(agentId, fallbackTimer);
 
     // Update status
@@ -457,7 +503,7 @@ Task: ${task}`;
       case 'claude':
         parts.push('claude', '--dangerously-skip-permissions');
         if (config.provider === 'claude' && config.model) {
-          parts.push('-m', config.model);
+          parts.push('--model', config.model);
         }
         break;
       case 'gemini':
@@ -493,26 +539,42 @@ Task: ${task}`;
 
   /**
    * Deliver a pending prompt to an agent whose CLI is now ready for input.
+   *
+   * Swarm prompts are deliberately multi-line. Use bracketed paste so the PTY
+   * preserves that structure without interpreting embedded newlines as separate
+   * submit keypresses before the final `\r`.
    */
   private async deliverPendingPrompt(agent: Agent): Promise<void> {
     const prompt = this.pendingPrompts.get(agent.id);
     if (!prompt) return;
+    this.clearPendingPromptState(agent.id);
 
-    this.pendingPrompts.delete(agent.id);
-
-    const timer = this.pendingPromptTimers.get(agent.id);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingPromptTimers.delete(agent.id);
-    }
+    const normalizedPrompt = prompt
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const payload = normalizedPrompt.includes('\n')
+      ? `${BRACKETED_PASTE_START}${normalizedPrompt}${BRACKETED_PASTE_END}\r`
+      : `${normalizedPrompt}\r`;
 
     try {
       await invoke('pty_write', {
         sessionId: agent.sessionId,
-        data: `${prompt}\r`,
+        data: payload,
       });
     } catch (error) {
       console.error(`AgentManager: failed to deliver prompt to agent ${agent.id}:`, error);
+    }
+  }
+
+  private clearPendingPromptState(agentId: string): void {
+    this.pendingPrompts.delete(agentId);
+    this.readyAccumulator.delete(agentId);
+    this.cliLaunchedAt.delete(agentId);
+
+    const timer = this.pendingPromptTimers.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingPromptTimers.delete(agentId);
     }
   }
 
@@ -544,6 +606,7 @@ Task: ${task}`;
   async terminateAgent(agentId: string, reason: string = 'User terminated'): Promise<void> {
     const agent = this.agents.get(agentId);
     if (!agent) return;
+    this.clearPendingPromptState(agentId);
 
     try {
       // Send Ctrl+C first to gracefully stop
@@ -563,14 +626,6 @@ Task: ${task}`;
     }
 
     agent.status = 'terminated';
-
-    // Cancel any pending prompt delivery
-    this.pendingPrompts.delete(agentId);
-    const timer = this.pendingPromptTimers.get(agentId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingPromptTimers.delete(agentId);
-    }
 
     this.eventEmitter.emitAgentEvent({
       type: 'terminated',

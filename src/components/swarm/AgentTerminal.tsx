@@ -2,8 +2,9 @@
  * AgentTerminal - Interactive terminal card for a single CLI Claude agent
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Agent } from '../../services/swarm/types';
+import { SwarmPtyTerminal } from './SwarmPtyTerminal';
 import './AgentTerminal.css';
 
 interface AgentTerminalProps {
@@ -24,11 +25,7 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
   onToggleExpand,
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const terminalRef = useRef<HTMLDivElement>(null);
   const displayName = agent.label || agent.role.name;
-  const outputLines = agent.outputBuffer
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
   const taskSummary = (() => {
     const lines = agent.assignedTask
       .split('\n')
@@ -43,13 +40,6 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
   const ownershipSummary = agent.ownedFiles && agent.ownedFiles.length > 0
     ? `Owns ${agent.ownedFiles.slice(0, 3).join(', ')}${agent.ownedFiles.length > 3 ? '…' : ''}`
     : null;
-
-  // Auto-scroll to bottom when output changes
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
-  }, [agent.outputBuffer.length]);
 
   const getStatusColor = () => {
     switch (agent.status) {
@@ -135,17 +125,12 @@ export const AgentTerminal: React.FC<AgentTerminalProps> = ({
       )}
 
       {expanded && (
-        <div className="terminal-window" ref={terminalRef}>
-          {outputLines.length === 0 ? (
-            <div className="terminal-line muted">Launching Claude Code for {displayName}...</div>
-          ) : (
-            agent.outputBuffer.map((line, i) => (
-              <div key={i} className="terminal-line">
-                {line}
-              </div>
-            ))
-          )}
-        </div>
+        <SwarmPtyTerminal
+          agent={agent}
+          theme={theme}
+          className="terminal-window"
+          emptyText={`Launching Claude Code for ${displayName}...`}
+        />
       )}
 
       {!isFinished && expanded && (

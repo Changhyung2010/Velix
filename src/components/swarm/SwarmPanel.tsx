@@ -11,6 +11,7 @@ import { CoordinatorConfig } from '../../services/swarm/ClaudeCoordinator';
 import { Agent, AgentRoleType, AgentStatus, WorkerCLI } from '../../services/swarm/types';
 import { PROVIDERS, ProviderID } from '../../services/ai/types';
 import { AgentTerminal } from './AgentTerminal';
+import { SwarmPtyTerminal } from './SwarmPtyTerminal';
 import {
   SwarmMindMap,
   MindMapConnection,
@@ -361,7 +362,6 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [agentChatMsg, setAgentChatMsg] = useState('');
   const [showAgentTerminal, setShowAgentTerminal] = useState(false);
-  const agentTerminalScrollRef = useRef<HTMLDivElement>(null);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, MindMapPosition>>({});
   const [manualConnections, setManualConnections] = useState<MindMapConnection[]>([]);
@@ -740,6 +740,12 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     await manager.sendToAgent(agentId, data + '\r');
   }, []);
 
+  const handleWriteInput = useCallback(async (agentId: string, data: string) => {
+    const manager = managerRef.current;
+    if (!manager) return;
+    await manager.sendToAgent(agentId, data);
+  }, []);
+
   const handleMindMapNodeMove = useCallback((nodeId: string, position: MindMapPosition) => {
     setNodePositions((prev) => ({
       ...prev,
@@ -821,14 +827,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     [boardAssignmentsBase],
   );
 
-  // Auto-scroll agent terminal to bottom when output updates
   const selectedAgent = selectedAgentId ? agentsByAssignment.get(selectedAgentId) : undefined;
-  const selectedAgentOutputLen = selectedAgent?.outputBuffer?.length ?? 0;
-  useEffect(() => {
-    if (showAgentTerminal && agentTerminalScrollRef.current) {
-      agentTerminalScrollRef.current.scrollTop = agentTerminalScrollRef.current.scrollHeight;
-    }
-  }, [showAgentTerminal, selectedAgentOutputLen]);
 
   const handleMindMapRoleDrop = useCallback((roleValue: string, position: MindMapPosition) => {
     const role = ROLE_ORDER.find((candidate) => candidate === roleValue);
@@ -1028,15 +1027,17 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
                 </div>
 
                 {showAgentTerminal && agent && (
-                  <div className="smm-agent-terminal" ref={agentTerminalScrollRef}>
-                    {agent.outputBuffer.length === 0 ? (
-                      <span className="smm-agent-terminal-empty">Waiting for output…</span>
-                    ) : (
-                      agent.outputBuffer.map((line, i) => (
-                        <div key={i} className="smm-agent-terminal-line">{line || '\u00A0'}</div>
-                      ))
-                    )}
-                  </div>
+                  <SwarmPtyTerminal
+                    key={agent.id}
+                    agent={agent}
+                    theme={theme}
+                    className="smm-agent-terminal"
+                    emptyText="Waiting for output…"
+                    interactive={!FINISHED_STATUSES.has(agent.status)}
+                    resizeSession
+                    autoFocus
+                    onWriteInput={handleWriteInput}
+                  />
                 )}
 
                 {!agent ? (

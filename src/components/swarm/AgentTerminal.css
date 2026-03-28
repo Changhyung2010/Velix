@@ -143,10 +143,9 @@
 /* ── Terminal Window ─────────────────────────────── */
 .terminal-window {
   flex: 1;
-  padding: 8px 10px;
-  background: var(--bg-code);
-  color: var(--text-primary);
-  overflow-y: auto;
+  min-height: 160px;
+  background: var(--bg-terminal);
+  overflow: hidden;
   height: 160px;
   transition: height 0.2s ease;
 }
@@ -155,19 +154,8 @@
   height: 380px;
 }
 
-.terminal-line {
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: var(--text-secondary);
-  padding: 0;
-}
-
-.terminal-line.muted {
-  color: var(--text-secondary);
-  opacity: 0.6;
-  font-style: italic;
+.terminal-window .swarm-pty-terminal {
+  height: 100%;
 }
 
 /* ── Input Row ───────────────────────────────────── */

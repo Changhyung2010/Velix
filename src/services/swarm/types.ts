@@ -98,6 +98,7 @@ export interface Agent {
   startedAt: Date;
   lastActivityAt: Date;
   outputBuffer: string[]; // Rolling buffer of last N lines
+  terminalOutput: string; // Raw PTY stream used for terminal replay
   metrics: AgentMetrics;
 }
 

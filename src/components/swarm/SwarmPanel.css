@@ -1577,39 +1577,14 @@
   flex: 1;
   min-height: 0;
   max-height: 300px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 12px;
+  overflow: hidden;
+  padding: 0;
   background: var(--bg-terminal, var(--bg-primary));
   border-bottom: 1px solid var(--border-light);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.35;
-  scrollbar-width: thin;
 }
 
-.smm-agent-terminal::-webkit-scrollbar {
-  width: 4px;
-}
-
-.smm-agent-terminal::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.smm-agent-terminal::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 2px;
-}
-
-.smm-agent-terminal-line {
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.smm-agent-terminal-empty {
-  color: var(--text-hint);
-  font-style: italic;
+.smm-agent-terminal .swarm-pty-terminal {
+  height: 100%;
 }
 
 .smm-agent-chat-notice {
