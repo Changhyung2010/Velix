@@ -360,6 +360,8 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
   const [coordinatorLog, setCoordinatorLog] = useState<CoordinatorLogEntry[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [agentChatMsg, setAgentChatMsg] = useState('');
+  const [showAgentTerminal, setShowAgentTerminal] = useState(false);
+  const agentTerminalScrollRef = useRef<HTMLDivElement>(null);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, MindMapPosition>>({});
   const [manualConnections, setManualConnections] = useState<MindMapConnection[]>([]);
@@ -819,6 +821,15 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
     [boardAssignmentsBase],
   );
 
+  // Auto-scroll agent terminal to bottom when output updates
+  const selectedAgent = selectedAgentId ? agentsByAssignment.get(selectedAgentId) : undefined;
+  const selectedAgentOutputLen = selectedAgent?.outputBuffer?.length ?? 0;
+  useEffect(() => {
+    if (showAgentTerminal && agentTerminalScrollRef.current) {
+      agentTerminalScrollRef.current.scrollTop = agentTerminalScrollRef.current.scrollHeight;
+    }
+  }, [showAgentTerminal, selectedAgentOutputLen]);
+
   const handleMindMapRoleDrop = useCallback((roleValue: string, position: MindMapPosition) => {
     const role = ROLE_ORDER.find((candidate) => candidate === roleValue);
     if (!role) return;
@@ -992,18 +1003,42 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
             const agent = node ? agentsByAssignment.get(node.id) : undefined;
             if (!node) return null;
             return (
-              <div className="smm-agent-chat">
+              <div className={`smm-agent-chat${showAgentTerminal ? ' smm-agent-chat-expanded' : ''}`}>
                 <div className="smm-agent-chat-header">
                   <div className="smm-agent-chat-info">
                     <strong>{node.label}</strong>
                     <span>{node.role} · {node.tone}</span>
                   </div>
-                  <button
-                    className="smm-agent-chat-close"
-                    onClick={() => { setSelectedAgentId(null); setAgentChatMsg(''); }}
-                    aria-label="Close"
-                  >×</button>
+                  <div className="smm-agent-chat-actions">
+                    {agent && (
+                      <button
+                        className={`smm-agent-terminal-toggle${showAgentTerminal ? ' active' : ''}`}
+                        onClick={() => setShowAgentTerminal((prev) => !prev)}
+                        title={showAgentTerminal ? 'Hide terminal' : 'Show terminal output'}
+                      >
+                        {showAgentTerminal ? '⌃ Hide Terminal' : '⌄ Show Terminal'}
+                      </button>
+                    )}
+                    <button
+                      className="smm-agent-chat-close"
+                      onClick={() => { setSelectedAgentId(null); setAgentChatMsg(''); setShowAgentTerminal(false); }}
+                      aria-label="Close"
+                    >×</button>
+                  </div>
                 </div>
+
+                {showAgentTerminal && agent && (
+                  <div className="smm-agent-terminal" ref={agentTerminalScrollRef}>
+                    {agent.outputBuffer.length === 0 ? (
+                      <span className="smm-agent-terminal-empty">Waiting for output…</span>
+                    ) : (
+                      agent.outputBuffer.map((line, i) => (
+                        <div key={i} className="smm-agent-terminal-line">{line || '\u00A0'}</div>
+                      ))
+                    )}
+                  </div>
+                )}
+
                 {!agent ? (
                   <p className="smm-agent-chat-notice">Agent will accept input once launched.</p>
                 ) : FINISHED_STATUSES.has(agent.status) ? (
