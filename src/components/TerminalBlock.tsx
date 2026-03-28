@@ -95,6 +95,7 @@ interface TerminalBlockProps {
 export interface TerminalRef {
   write: (data: string) => void;
   focus: () => void;
+  fit: () => void;
 }
 
 interface PtyOutput {
@@ -480,7 +481,10 @@ export const TerminalBlock = forwardRef<TerminalRef, TerminalBlockProps>(({
     },
     focus: () => {
       termRef.current?.focus();
-    }
+    },
+    fit: () => {
+      fitAddonRef.current?.fit();
+    },
   }));
 
   // Track last PTY dimensions to avoid redundant resize calls

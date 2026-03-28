@@ -2033,6 +2033,16 @@ html, body, #root {
   min-height: 0;
   margin: 0;
   padding: 0;
+  position: relative;
+}
+
+/* Hidden (inactive) tab panels are position:absolute so they retain
+   their layout dimensions and the terminal doesn't need to re-fit
+   when the tab becomes active again. */
+.terminal-tab-panel:not(.active) {
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .terminal-tab-panel {

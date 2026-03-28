@@ -168,7 +168,17 @@ function App() {
     if (activeTerminalId !== "swarm") {
       setLastWorkspaceTabId(activeTerminalId);
     }
-  }, [activeTerminalId]);
+    // When switching tabs, immediately fit all terminal panes in the newly
+    // active tab so they render at the correct size without a visible flash.
+    requestAnimationFrame(() => {
+      const activeTab = workspaceTabs.find((t) => t.id === activeTerminalId);
+      if (activeTab) {
+        for (const pane of activeTab.panes) {
+          terminalRefs.current.get(pane.id)?.fit();
+        }
+      }
+    });
+  }, [activeTerminalId, workspaceTabs]);
 
   const addWorkspaceTab = useCallback(() => {
     const newTabId = makeId("tab");
@@ -1231,7 +1241,7 @@ Working directory: ${currentDir || "unknown"}`;
               {swarmTabOpen && (
                 <div
                   className={`terminal-tab-panel terminal-tab-panel-swarm${activeTerminalId === "swarm" ? " active" : ""}`}
-                  style={{ display: activeTerminalId === "swarm" ? "flex" : "none" }}
+                  style={activeTerminalId === "swarm" ? undefined : { visibility: "hidden", position: "absolute", pointerEvents: "none" }}
                 >
                   <SwarmPanel
                     isOpen={true}
@@ -1250,10 +1260,10 @@ Working directory: ${currentDir || "unknown"}`;
                       ? Math.max(0, Math.min(paneDropPreview.index, tab.panes.length))
                       : null;
                   const renderedPaneCount = tab.panes.length + (previewIndex !== null ? 1 : 0);
-                  const panelStyle =
-                    tab.id === activeTerminalId
-                      ? getPaneGridStyle(renderedPaneCount)
-                      : { display: "none" };
+                  const isActiveTab = tab.id === activeTerminalId;
+                  const panelStyle = isActiveTab
+                    ? getPaneGridStyle(renderedPaneCount)
+                    : { ...getPaneGridStyle(renderedPaneCount), visibility: "hidden" as const, position: "absolute" as const, pointerEvents: "none" as const };
                   const renderItems: Array<
                     | { type: "pane"; pane: TerminalPaneState }
                     | { type: "preview"; key: string }
