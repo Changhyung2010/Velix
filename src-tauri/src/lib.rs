@@ -229,6 +229,26 @@ struct TerminalExit {
     exit_code: Option<i32>,
 }
 
+/// Cached full PATH from a login shell.
+static LOGIN_SHELL_PATH: OnceLock<String> = OnceLock::new();
+
+fn get_login_shell_path() -> String {
+    LOGIN_SHELL_PATH
+        .get_or_init(|| {
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+            std::process::Command::new(&shell)
+                .args(["-l", "-c", "echo $PATH"])
+                .env("HOME", dirs_or_home())
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default())
+        })
+        .clone()
+}
+
 // ==================== PTY Terminal Commands ====================
 
 #[tauri::command]
@@ -256,17 +276,8 @@ fn pty_create(
     // Get the shell path - use user's default shell or fallback to zsh
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
 
-    // Get the full PATH from the user's login shell so tools installed via
-    // nvm, homebrew, cargo, etc. are available in the PTY terminal.
-    let full_path = std::process::Command::new(&shell)
-        .args(["-l", "-c", "echo $PATH"])
-        .env("HOME", dirs_or_home())
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default());
+    // Get the full PATH from the cached login shell environment.
+    let full_path = get_login_shell_path();
 
     let mut cmd = CommandBuilder::new(&shell);
     cmd.arg("-l"); // Login shell to load user's profile

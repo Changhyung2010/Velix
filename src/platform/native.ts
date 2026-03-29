@@ -23,17 +23,13 @@ interface OpenDialogOptions {
   multiple?: boolean;
 }
 
-type RuntimeTarget = "tauri" | "electron" | "web";
-
-const isElectronRuntime = () =>
-  typeof window !== "undefined" && Boolean(window.__VELIX_ELECTRON__);
+type RuntimeTarget = "tauri" | "web";
 
 const isTauriRuntime = () =>
   typeof window !== "undefined" &&
   (Boolean(window.__TAURI__) || Boolean(window.__TAURI_INTERNALS__));
 
 export const getRuntimeTarget = (): RuntimeTarget => {
-  if (isElectronRuntime()) return "electron";
   if (isTauriRuntime()) return "tauri";
   return "web";
 };
@@ -41,16 +37,8 @@ export const getRuntimeTarget = (): RuntimeTarget => {
 const unsupportedRuntime = (apiName: string): never => {
   throw new Error(
     `${apiName} is not available in runtime "${getRuntimeTarget()}". ` +
-      `Use Electron or Tauri desktop runtime.`,
+      `Run the Velix desktop app (Tauri).`,
   );
-};
-
-const requireElectronApi = (): NonNullable<Window["__VELIX_ELECTRON__"]> => {
-  const api = window.__VELIX_ELECTRON__;
-  if (!api) {
-    throw new Error("Electron bridge is not available.");
-  }
-  return api;
 };
 
 let tauriCoreModule: Promise<typeof import("@tauri-apps/api/core")> | null = null;
@@ -74,9 +62,6 @@ export async function invoke<T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().invoke<T>(command, args);
-  }
   if (isTauriRuntime()) {
     const { invoke: tauriInvoke } = await tauriCore();
     return tauriInvoke<T>(command, args);
@@ -88,11 +73,6 @@ export async function listen<T>(
   eventName: string,
   handler: (event: PlatformEvent<T>) => void,
 ): Promise<UnlistenFn> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().listen(eventName, (payload) => {
-      handler({ payload: payload as T });
-    });
-  }
   if (isTauriRuntime()) {
     const { listen: tauriListen } = await tauriEvent();
     return tauriListen<T>(eventName, handler);
@@ -101,9 +81,6 @@ export async function listen<T>(
 }
 
 export async function readDir(path: string): Promise<DirEntry[]> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().readDir(path);
-  }
   if (isTauriRuntime()) {
     const { readDir: tauriReadDir } = await tauriFs();
     return tauriReadDir(path);
@@ -112,9 +89,6 @@ export async function readDir(path: string): Promise<DirEntry[]> {
 }
 
 export async function readTextFile(path: string): Promise<string> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().readTextFile(path);
-  }
   if (isTauriRuntime()) {
     const { readTextFile: tauriReadTextFile } = await tauriFs();
     return tauriReadTextFile(path);
@@ -126,9 +100,6 @@ export async function writeTextFile(
   path: string,
   contents: string,
 ): Promise<void> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().writeTextFile(path, contents);
-  }
   if (isTauriRuntime()) {
     const { writeTextFile: tauriWriteTextFile } = await tauriFs();
     return tauriWriteTextFile(path, contents);
@@ -137,9 +108,6 @@ export async function writeTextFile(
 }
 
 export async function remove(path: string): Promise<void> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().remove(path);
-  }
   if (isTauriRuntime()) {
     const { remove: tauriRemove } = await tauriFs();
     return tauriRemove(path);
@@ -150,14 +118,6 @@ export async function remove(path: string): Promise<void> {
 export async function open(
   options: OpenDialogOptions,
 ): Promise<string | string[] | null> {
-  if (isElectronRuntime()) {
-    if (!options.directory || options.multiple) {
-      throw new Error(
-        "Electron dialog bridge currently supports directory-only single selection.",
-      );
-    }
-    return requireElectronApi().openDirectory();
-  }
   if (isTauriRuntime()) {
     const { open: tauriOpen } = await tauriDialog();
     return tauriOpen(options);
@@ -166,9 +126,6 @@ export async function open(
 }
 
 export async function isPermissionGranted(): Promise<boolean> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().isNotificationPermissionGranted();
-  }
   if (isTauriRuntime()) {
     const notification = await tauriNotification();
     return notification.isPermissionGranted();
@@ -177,9 +134,6 @@ export async function isPermissionGranted(): Promise<boolean> {
 }
 
 export async function requestPermission(): Promise<NotificationPermissionState> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().requestNotificationPermission();
-  }
   if (isTauriRuntime()) {
     const notification = await tauriNotification();
     return notification.requestPermission();
@@ -190,9 +144,6 @@ export async function requestPermission(): Promise<NotificationPermissionState> 
 export async function sendNotification(
   payload: NotificationPayload,
 ): Promise<void> {
-  if (isElectronRuntime()) {
-    return requireElectronApi().sendNotification(payload);
-  }
   if (isTauriRuntime()) {
     const notification = await tauriNotification();
     return notification.sendNotification(payload);

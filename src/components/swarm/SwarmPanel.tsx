@@ -469,6 +469,12 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
       }
     });
 
+    const unsubscribeSpawn = manager.onAgentSpawned(() => {
+      if (!disposed) {
+        refreshAgents();
+      }
+    });
+
     return () => {
       disposed = true;
       stopAutoSync();
@@ -476,6 +482,7 @@ export const SwarmPanel: React.FC<SwarmPanelProps> = ({
       void manager.cleanup();
       unsubscribeOutput();
       unsubscribeExit();
+      unsubscribeSpawn();
       managerRef.current = null;
     };
   }, [isOpen, refreshAgents, stopAutoSync, workspacePath]);

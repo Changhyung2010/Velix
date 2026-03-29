@@ -55,6 +55,17 @@ const CLI_READY_PATTERNS = [
   /\?\s*$/m,             // Gemini-style "?" prompt
 ];
 
+// Patterns that indicate a shell is ready for a command.
+const SHELL_READY_PATTERNS = [
+  /% \s*$/m,
+  /\$ \s*$/m,
+  /# \s*$/m,
+  /❯\s*$/m,              // Common in modern shell themes (e.g. Pure, Powerlevel10k)
+  /➜\s*$/m,              // Common in Oh My Zsh
+  /\[.*\][%\$#]\s*$/m,   // Common multi-line prompts
+  /\n[%\$#]\s*$/m,       // Simple newline + prompt
+];
+
 // Patterns that indicate the CLI has returned to idle after completing a task.
 // Tested against the LAST ~100 chars of accumulated output (not the whole buffer)
 // to avoid false-positives from content lines containing ">" or "?".
@@ -184,13 +195,18 @@ export class AgentManager {
   private globalExitListener: UnlistenFn | null = null;
   private outputCallbacks: Array<(agentId: string, data: string) => void> = [];
   private exitCallbacks: Array<(agentId: string, exitCode: number | null) => void> = [];
+  private spawnCallbacks: Array<(agentId: string) => void> = [];
   private patternDetector: ((output: string) => PatternMatch | null) | null = null;
   // Prompts waiting to be delivered once the CLI shows its ready indicator
   private pendingPrompts: Map<string, string> = new Map();
   private pendingPromptTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  // Accumulated sanitized output per agent (for ready-pattern matching)
-  private readyAccumulator: Map<string, string> = new Map();
-  // Timestamp when the CLI launch command was sent (to enforce minimum startup delay)
+  // Phase of the launch sequence: 'shell' | 'cli' | 'running'
+  private launchPhase: Map<string, 'shell' | 'cli' | 'running'> = new Map();
+  // Accumulated sanitized output per agent (for prompt/readiness matching)
+  private outputAccumulator: Map<string, string> = new Map();
+  // Timestamp when the PTY shell was spawned
+  private shellSpawnedAt: Map<string, number> = new Map();
+  // Timestamp when the CLI launch command was sent
   private cliLaunchedAt: Map<string, number> = new Map();
   // Agents whose initial prompt has been delivered — we now watch for them to return to idle
   private promptDeliveredAt: Map<string, number> = new Map();
@@ -258,7 +274,9 @@ export class AgentManager {
     for (const agentId of new Set([
       ...this.pendingPrompts.keys(),
       ...this.pendingPromptTimers.keys(),
-      ...this.readyAccumulator.keys(),
+      ...this.launchPhase.keys(),
+      ...this.outputAccumulator.keys(),
+      ...this.shellSpawnedAt.keys(),
       ...this.cliLaunchedAt.keys(),
     ])) {
       this.clearPendingPromptState(agentId);
@@ -294,20 +312,50 @@ export class AgentManager {
     if (!agent) return;
     const sanitizedData = sanitizeTerminalOutput(data);
 
-    // If the CLI hasn't received its first prompt yet, accumulate output and check readiness
-    if (this.pendingPrompts.has(agentId)) {
-      const prev = this.readyAccumulator.get(agentId) || '';
-      // Keep only the tail of recent output to avoid unbounded growth.
+    // If the CLI hasn't received its first prompt yet, handle the launch sequence
+    const phase = this.launchPhase.get(agentId);
+    if (phase && phase !== 'running') {
+      const prev = this.outputAccumulator.get(agentId) || '';
       const accumulated = (prev + sanitizedData).slice(-READY_ACCUMULATOR_MAX_CHARS);
-      this.readyAccumulator.set(agentId, accumulated);
+      this.outputAccumulator.set(agentId, accumulated);
 
-      // Only start checking after the minimum startup delay
-      const launchedAt = this.cliLaunchedAt.get(agentId) || 0;
-      if (Date.now() - launchedAt >= CLI_MIN_STARTUP_MS) {
-        const isReady = CLI_READY_PATTERNS.some((pattern) => pattern.test(accumulated));
-        if (isReady) {
-          console.log(`AgentManager: CLI ready detected for ${agentId} — delivering prompt`);
-          await this.deliverPendingPrompt(agent);
+      if (phase === 'shell') {
+        // Step 1: Wait for shell prompt, then launch CLI
+        const spawnedAt = this.shellSpawnedAt.get(agentId) || 0;
+        const isReady = SHELL_READY_PATTERNS.some((pattern) => pattern.test(accumulated));
+        // Also allow manual nudge if shell takes too long (> 5s)
+        if (isReady || Date.now() - spawnedAt >= 5000) {
+          console.log(`AgentManager: Shell ready detected for ${agentId} — launching CLI`);
+          this.launchPhase.set(agentId, 'cli');
+          this.cliLaunchedAt.set(agentId, Date.now());
+          this.outputAccumulator.set(agentId, ''); // Clear for next phase
+
+          // Reset fallback timer for CLI startup phase
+          const oldTimer = this.pendingPromptTimers.get(agentId);
+          if (oldTimer) clearTimeout(oldTimer);
+
+          const newTimer = setTimeout(() => {
+            const a = this.agents.get(agentId);
+            if (a && this.pendingPrompts.has(agentId)) {
+              console.warn(`AgentManager: fallback timer fired for ${agentId} — delivering prompt without ready confirmation`);
+              void this.deliverPendingPrompt(a);
+            }
+          }, CLI_FALLBACK_TIMEOUT_MS);
+          this.pendingPromptTimers.set(agentId, newTimer);
+
+          const startCommand = this.buildWorkerStartCommand();
+          await invoke('pty_write', { sessionId: agent.sessionId, data: startCommand });
+        }
+      } else if (phase === 'cli') {
+        // Step 2: Wait for CLI prompt, then deliver instruction
+        const launchedAt = this.cliLaunchedAt.get(agentId) || 0;
+        // Only start checking after a small delay to avoid echoing the start command
+        if (Date.now() - launchedAt >= 1000) {
+          const isReady = CLI_READY_PATTERNS.some((pattern) => pattern.test(accumulated));
+          if (isReady) {
+            console.log(`AgentManager: CLI ready detected for ${agentId} — delivering prompt`);
+            await this.deliverPendingPrompt(agent);
+          }
         }
       }
     }
@@ -387,6 +435,10 @@ export class AgentManager {
   private handleAgentExit(agentId: string, exitCode: number | null): void {
     const agent = this.agents.get(agentId);
     if (!agent) return;
+
+    // If the agent was already terminated by us, don't set 'failed' status
+    if (agent.status === 'terminated') return;
+
     this.clearPendingPromptState(agentId);
     this.promptDeliveredAt.delete(agentId);
     this.idleAccumulator.delete(agentId);
@@ -496,17 +548,18 @@ export class AgentManager {
     try {
       await writeTextFile(promptFilePath, prompt);
     } catch (err) {
-      console.error('AgentManager: failed to write prompt file:', err);
+      console.error(`AgentManager: failed to write prompt file for ${agentId}:`, err);
+      agent.status = 'failed';
+      this.eventEmitter.emitAgentEvent({ type: 'failed', agentId, error: `Failed to write prompt file: ${err}` });
+      return agent;
     }
 
-    // Step 1: launch the CLI interactively (this part works reliably)
-    const startCommand = this.buildWorkerStartCommand();
-    this.cliLaunchedAt.set(agentId, Date.now());
-    this.readyAccumulator.set(agentId, '');
-    await invoke('pty_write', { sessionId, data: startCommand });
+    // Phase 1: shell just spawned. We wait for shell prompt before launching CLI.
+    this.launchPhase.set(agentId, 'shell');
+    this.shellSpawnedAt.set(agentId, Date.now());
+    this.outputAccumulator.set(agentId, '');
 
     // Step 2: once the CLI is ready, send a short single-line instruction to read the prompt file.
-    // This is just plain text + Enter — no bracketed paste, no multi-line escaping.
     const shortInstruction = `Read the file ${promptFileName} in the current directory. It contains your full task instructions. Follow every instruction in that file exactly — do not summarize or skip anything. Begin working immediately.`;
     this.pendingPrompts.set(agentId, shortInstruction);
     const fallbackTimer = setTimeout(() => {
@@ -527,6 +580,11 @@ export class AgentManager {
       agentId,
       role: role.type,
     });
+
+    // Notify spawn subscribers so the UI can update immediately
+    for (const callback of this.spawnCallbacks) {
+      try { callback(agentId); } catch { /* ignore */ }
+    }
 
     return agent;
   }
@@ -597,27 +655,34 @@ Task: ${task}`;
         break;
     }
 
-    return parts.join(' ') + '\r';
+    return 'set +e 2>/dev/null; ' + parts.join(' ') + '\r';
   }
 
 
   /**
    * Deliver a pending prompt to an agent whose CLI is now ready for input.
    *
-   * The prompt is now a SHORT single-line instruction (e.g. "Read file X and follow it")
+   * The prompt is a SHORT single-line instruction (e.g. "Read file X and follow it")
    * so no bracketed paste is needed — just plain text + Enter.
    */
   private async deliverPendingPrompt(agent: Agent): Promise<void> {
     const prompt = this.pendingPrompts.get(agent.id);
     if (!prompt) return;
+
+    // Safety: only deliver the prompt if we've already launched the CLI
+    if (this.launchPhase.get(agent.id) !== 'cli') {
+      console.warn(`AgentManager: deliverPendingPrompt called too early for ${agent.id} (phase: ${this.launchPhase.get(agent.id)}) — deferring.`);
+      return;
+    }
+
     this.clearPendingPromptState(agent.id);
 
     // Start tracking idle state — the CLI is now "working" on the task
     this.promptDeliveredAt.set(agent.id, Date.now());
     this.idleAccumulator.set(agent.id, '');
+    this.launchPhase.set(agent.id, 'running');
 
     try {
-      // Send the instruction as plain text + Enter
       await invoke('pty_write', {
         sessionId: agent.sessionId,
         data: `${prompt}\r`,
@@ -629,7 +694,9 @@ Task: ${task}`;
 
   private clearPendingPromptState(agentId: string): void {
     this.pendingPrompts.delete(agentId);
-    this.readyAccumulator.delete(agentId);
+    this.launchPhase.delete(agentId);
+    this.outputAccumulator.delete(agentId);
+    this.shellSpawnedAt.delete(agentId);
     this.cliLaunchedAt.delete(agentId);
 
     const timer = this.pendingPromptTimers.get(agentId);
@@ -781,6 +848,19 @@ Task: ${task}`;
       const index = this.exitCallbacks.indexOf(callback);
       if (index !== -1) {
         this.exitCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Subscribe to agent spawn
+   */
+  onAgentSpawned(callback: (agentId: string) => void): () => void {
+    this.spawnCallbacks.push(callback);
+    return () => {
+      const index = this.spawnCallbacks.indexOf(callback);
+      if (index !== -1) {
+        this.spawnCallbacks.splice(index, 1);
       }
     };
   }

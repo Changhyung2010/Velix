@@ -118,7 +118,7 @@ function getLocalCommandSuggestion(input: string, npmScripts: string[]): string 
   // npm suggestions driven by package.json scripts
   if (lower === 'npm') {
     const preferred =
-      npmScripts.find((s) => s.includes('tauri') || s.includes('electron') || s === 'dev') ||
+      npmScripts.find((s) => s.includes('tauri') || s === 'dev') ||
       npmScripts[0];
     return preferred ? `npm run ${preferred}` : 'npm run dev';
   }
@@ -133,8 +133,6 @@ function getLocalCommandSuggestion(input: string, npmScripts: string[]): string 
       'test',
       'tauri',
       'tauri dev',
-      'electron',
-      'dev:electron',
       'lint',
       'preview',
     ];
@@ -145,7 +143,7 @@ function getLocalCommandSuggestion(input: string, npmScripts: string[]): string 
     const partial = lower.slice('npm '.length);
     if ('run'.startsWith(partial)) {
       const preferred =
-        npmScripts.find((s) => s.includes('tauri') || s.includes('electron') || s === 'dev') ||
+        npmScripts.find((s) => s.includes('tauri') || s === 'dev') ||
         npmScripts[0];
       if (preferred) return `npm run ${preferred}`;
     }

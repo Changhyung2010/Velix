@@ -2,14 +2,14 @@
 
 > An AI-powered desktop IDE that brings multi-provider AI, a full terminal, and a code editor into one native application.
 
-Built with React + TypeScript on the frontend, with both **Tauri** (Rust) and **Electron** (Node.js) desktop runtimes. Designed around a minimal, distraction-free workflow — warm neutrals, deep teal accents, and everything you need in a single window.
+Built with React + TypeScript on the frontend and **Tauri 2** (Rust) for the desktop shell. Designed around a minimal, distraction-free workflow — warm neutrals, deep teal accents, and everything you need in a single window.
 
 ---
 
 ## Features
 
 **Core IDE**
-- Native desktop app — macOS, Windows, Linux via Tauri or Electron
+- Native desktop app — macOS, Windows, Linux via Tauri
 - Full PTY terminal with tabs, split views, and persistent sessions
 - File explorer with tree-view sidebar
 - Syntax-highlighted code editor with configurable tab sizes and theme support
@@ -43,7 +43,7 @@ Built with React + TypeScript on the frontend, with both **Tauri** (Rust) and **
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
-- [Rust](https://www.rust-lang.org/tools/install) (required for Tauri runtime only)
+- [Rust](https://www.rust-lang.org/tools/install) (required for the Tauri desktop app)
 - An API key from at least one supported AI provider
 
 ### Install
@@ -57,21 +57,14 @@ npm install
 ### Run
 
 ```bash
-# Tauri (Rust backend) — recommended for production use
 npm run tauri dev
-
-# Electron (Node.js backend)
-npm run dev:electron
 ```
 
 ### Build
 
 ```bash
-# Frontend only
+# Frontend only (e.g. static check)
 npm run build
-
-# Electron desktop bundle
-npm run electron
 
 # Tauri desktop bundle
 npm run tauri build
@@ -105,11 +98,9 @@ velix/
 │   ├── services/         # AI, workspace, audio, and git services
 │   ├── styles/           # Component and global styles
 │   └── App.tsx           # Root application
-├── electron/             # Electron main process and preload bridge
 ├── src-tauri/            # Rust backend (Tauri 2)
-│   └── src/              # Tauri commands and native integrations
-├── public/               # Static assets
-└── scripts/              # Build and dev helper scripts
+│   └── src/              # Tauri commands, PTY, native integrations
+└── public/               # Static assets
 ```
 
 ---
@@ -119,8 +110,8 @@ velix/
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, TypeScript, Vite |
-| Desktop | Tauri 2 (Rust), Electron (Node.js) |
-| Terminal | xterm.js + node-pty |
+| Desktop | Tauri 2 (Rust) |
+| Terminal | xterm.js + PTY via Tauri (`portable-pty` in Rust) |
 | AI Engine | Custom multi-provider agent |
 | Styling | CSS custom properties, JetBrains Mono, Inter |
 
