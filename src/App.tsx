@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { open, invoke } from "./platform/native";
+import { open, invoke, writeTextFile, mkdir } from "./platform/native";
 import "./App.css";
 import { Settings, AIConfig, AI_PROVIDERS, AIProvider } from "./components/Settings";
 import { SetupScreen } from "./components/SetupScreen";
@@ -43,6 +43,41 @@ const RIGHT_PANEL_WIDTH_KEY = "velix-right-panel-width-pct";
 const clampRightPanelPct = (n: number) => {
   if (!Number.isFinite(n)) return 40;
   return Math.min(78, Math.max(22, n));
+};
+
+/** Normalize path separators for safe string operations (Tauri FS accepts forward slashes). */
+const normalizePathSep = (p: string) => p.replace(/\\/g, "/");
+
+/**
+ * Resolve an AI-suggested file path to an absolute path under `projectRoot`.
+ * Rejects traversal (`..`), NUL, and absolute paths outside the project.
+ */
+const resolveAiWritePath = (
+  projectRoot: string,
+  filePath: string,
+): string | null => {
+  const root = normalizePathSep(projectRoot).replace(/\/+$/, "");
+  const raw = filePath.trim();
+  if (!raw || raw.includes("\0")) return null;
+
+  const rel = normalizePathSep(raw);
+  if (rel.startsWith("/") || /^[a-zA-Z]:\/?/.test(rel)) {
+    const abs = normalizePathSep(rel).replace(/\/+$/, "") || rel;
+    const r = root.toLowerCase();
+    const a = abs.toLowerCase();
+    if (a !== r && !a.startsWith(`${r}/`)) return null;
+    return abs;
+  }
+
+  const segments = rel.split("/").filter((p) => p.length > 0);
+  if (segments.some((s) => s === "..")) return null;
+  return `${root}/${segments.join("/")}`;
+};
+
+const parentDirOfFile = (absoluteFilePath: string) => {
+  const n = normalizePathSep(absoluteFilePath);
+  const i = n.lastIndexOf("/");
+  return i > 0 ? n.slice(0, i) : n;
 };
 
 const getPaneGridColumnCount = (paneCount: number) => (paneCount <= 1 ? 1 : paneCount <= 4 ? 2 : 3);
@@ -666,13 +701,20 @@ Working directory: ${currentDir || "unknown"}`;
         if (pathMatch && contentMatch && currentDir) {
           const filePath = pathMatch[1].trim();
           const fileContent = contentMatch[1].trim();
-          const fullPath = filePath.startsWith("/") ? filePath : `${currentDir}/${filePath}`;
+          const fullPath = resolveAiWritePath(currentDir, filePath);
+
+          if (!fullPath) {
+            targetTerminals.forEach((terminal) => {
+              terminal.write(
+                `\x1b[31m✗ Refused unsafe path (must stay under project): ${filePath}\x1b[0m\r\n`,
+              );
+            });
+            continue;
+          }
 
           try {
-            await invoke("execute_shell_command", {
-              command: `cat > "${fullPath}" << 'VELIX_EOF'\n${fileContent}\nVELIX_EOF`,
-              cwd: currentDir,
-            });
+            await mkdir(parentDirOfFile(fullPath), { recursive: true });
+            await writeTextFile(fullPath, fileContent);
             didModifyFiles = true;
             targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[32m✓ File modified: ${fullPath}\x1b[0m\r\n`);
@@ -696,14 +738,20 @@ Working directory: ${currentDir || "unknown"}`;
         if (pathMatch && contentMatch && currentDir) {
           const filePath = pathMatch[1].trim();
           const fileContent = contentMatch[1].trim();
-          const fullPath = filePath.startsWith("/") ? filePath : `${currentDir}/${filePath}`;
-          const parentDir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+          const fullPath = resolveAiWritePath(currentDir, filePath);
+
+          if (!fullPath) {
+            targetTerminals.forEach((terminal) => {
+              terminal.write(
+                `\x1b[31m✗ Refused unsafe path (must stay under project): ${filePath}\x1b[0m\r\n`,
+              );
+            });
+            continue;
+          }
 
           try {
-            await invoke("execute_shell_command", {
-              command: `mkdir -p "${parentDir}" && cat > "${fullPath}" << 'VELIX_EOF'\n${fileContent}\nVELIX_EOF`,
-              cwd: currentDir,
-            });
+            await mkdir(parentDirOfFile(fullPath), { recursive: true });
+            await writeTextFile(fullPath, fileContent);
             didModifyFiles = true;
             targetTerminals.forEach((terminal) => {
               terminal.write(`\x1b[32m✓ File created: ${fullPath}\x1b[0m\r\n`);

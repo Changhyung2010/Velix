@@ -107,6 +107,17 @@ export async function writeTextFile(
   return unsupportedRuntime("writeTextFile");
 }
 
+export async function mkdir(
+  path: string,
+  options?: { recursive?: boolean },
+): Promise<void> {
+  if (isTauriRuntime()) {
+    const { mkdir: tauriMkdir } = await tauriFs();
+    return tauriMkdir(path, options);
+  }
+  return unsupportedRuntime("mkdir");
+}
+
 export async function remove(path: string): Promise<void> {
   if (isTauriRuntime()) {
     const { remove: tauriRemove } = await tauriFs();
