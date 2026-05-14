@@ -1313,6 +1313,7 @@ fn get_git_diff(repo_path: &str, file_path: &str, staged: bool) -> Result<String
     if staged {
         args.push("--cached");
     }
+    args.push("--");
     args.push(file_path);
 
     let output = Command::new("git")
